@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+
+# Android build
+.externalNativeBuild/
+.cxx/
+captures/
+
+# Native / CMake
+cmake-build-*/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# JVM crash dumps
+*.hprof
+
+# Temporary files
+*.swp
+*.swo
+
+# Signing / private keys
+*.jks
+*.keystore
+keystore.properties
