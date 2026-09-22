@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DroidProbe"
 include(":app")
- 
+include(":droidprobe")
