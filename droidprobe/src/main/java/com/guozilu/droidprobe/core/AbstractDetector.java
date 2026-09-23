@@ -27,7 +27,8 @@ public abstract class AbstractDetector implements Detector {
             return doDetect(context);
         }
         catch (Throwable throwable) {
-            return createErrorResult(throwable);
+            // return createErrorResult(throwable);
+            throw throwable;
         }
     }
 

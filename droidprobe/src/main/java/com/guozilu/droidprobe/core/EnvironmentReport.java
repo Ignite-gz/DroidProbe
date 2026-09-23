@@ -2,6 +2,8 @@ package com.guozilu.droidprobe.core;
 
 import android.os.Build;
 
+import androidx.annotation.NonNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -56,5 +58,14 @@ public class EnvironmentReport {
             }
             return retval;
         }
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+        return "EnvironmentReport{" +
+            "timestamp=" + timestamp +
+            ", results=" + results +
+            '}';
     }
 }

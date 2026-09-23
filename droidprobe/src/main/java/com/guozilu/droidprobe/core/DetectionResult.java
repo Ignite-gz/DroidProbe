@@ -10,19 +10,19 @@ public final class DetectionResult {
     private final DetectionCategory category;
     private final DetectionStatus status;
     private final RiskLevel riskLevel;
-    private final List<DetectionEvidence> evidence;
+    private final List<DetectionEvidence> evidences;
 
     public DetectionResult(String name, DetectionCategory category, DetectionStatus status,
-        RiskLevel riskLevel, List<DetectionEvidence> evidence) {
+        RiskLevel riskLevel, List<DetectionEvidence> evidences) {
 
         this.name = name;
         this.category = category;
         this.status = status;
         this.riskLevel = riskLevel;
-        this.evidence =
-            evidence == null
+        this.evidences =
+            evidences == null
             ? Collections.emptyList()
-            : Collections.unmodifiableList(evidence);
+            : Collections.unmodifiableList(evidences);
     }
 
     public String getName() {
@@ -41,8 +41,8 @@ public final class DetectionResult {
         return riskLevel;
     }
 
-    public List<DetectionEvidence> getEvidence() {
-        return evidence;
+    public List<DetectionEvidence> getEvidences() {
+        return evidences;
     }
 
     @NonNull
@@ -53,7 +53,7 @@ public final class DetectionResult {
             ", category=" + category +
             ", status=" + status +
             ", riskLevel=" + riskLevel +
-            ", evidence=" + evidence +
+            ", evidence=" + evidences +
             '}';
     }
 }

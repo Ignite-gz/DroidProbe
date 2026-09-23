@@ -15,7 +15,10 @@ public class RootDetector extends CompositeDetector {
 
     public RootDetector() {
         super("root", DetectionCategory.ROOT, Arrays.asList(
-            new RootAppDetector()
+            new RootAppDetector(),
+            new PotentiallyRiskyAppDetector(),
+            new SuDetector(),
+            new SystemPropertyDetector()
         ));
     }
 
