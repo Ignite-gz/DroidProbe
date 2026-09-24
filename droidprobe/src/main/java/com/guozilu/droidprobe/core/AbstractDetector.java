@@ -39,7 +39,7 @@ public abstract class AbstractDetector implements Detector {
 
     // 检测过程中发生了异常
     private DetectionResult createErrorResult(Throwable throwable) {
-        Log.e(TAG, "A Throwable threw in Detector.detect", throwable);
+        Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable);
         return new DetectionResult(getId(), getCategory(), DetectionStatus.ERROR,
             RiskLevel.UNKNOWN, Collections.emptyList());
     }
