@@ -27,7 +27,7 @@ public final class MountDetector extends AbstractDetector {
     private static final String TAG = "MountDetector";
 
     /**
-     * 提前预设的只读目录，一般情况下这些目录是不可能有写的权限的
+     * 提前预设的目录，一般情况下这些目录是不可能有写的权限的
      */
     private static final String[] SYSTEM_MOUNT_POINTS_TO_CHECK_PATHS = {
         "/system",
@@ -126,7 +126,7 @@ public final class MountDetector extends AbstractDetector {
     }
 
     /**
-     * 判断挂载路径是否在提前预设好的、指定好的路径中，这些预设的路径，正常情况下一定是只读的，不可能有写的权限
+     * 判断挂载路径是否在提前预设好的、指定好的路径中，这些预设的路径，正常情况下一定不可能有写的权限
      * @param mountPoint 需要判断的挂载路径
      * @return 如果在就返回 true，否则返回 false
      */
@@ -141,7 +141,7 @@ public final class MountDetector extends AbstractDetector {
     }
 
     /**
-     * 判断 target 在不在挂载选项 options 中，挂载选项大概像 ro,seclabel,relatime 这个样子
+     * 判断 target 在不在挂载选项 options 中，挂载选项的内容大概像 ro,seclabel,relatime 这个样子
      * @param options 挂载选项
      * @param target 需要检测在不在 options 中的一个 option
      * @return 如果 target 在 options 中返回 true，否则返回 false

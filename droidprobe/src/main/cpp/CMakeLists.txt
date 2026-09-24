@@ -28,9 +28,9 @@ include_directories(jni system process)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        jni/system_properties_jni.cpp
+        jni/system_properties_jni.cpp jni/process_identity_jni.cpp
         system/system_properties.cpp
-        process/mount_info.cpp
+        process/mount_info.cpp process/process_identity.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

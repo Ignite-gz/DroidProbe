@@ -10,6 +10,8 @@ import com.guozilu.droidprobe.core.DetectionResult;
 import com.guozilu.droidprobe.core.DetectionStatus;
 import com.guozilu.droidprobe.core.RiskLevel;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -19,17 +21,16 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * 这个类的检测功能其实和检测 su 是类似的
- * 都是在检查 magisk 二进制以及 which magisk
- * 所以这个类就是 SuDetector 的基础上进行了一些改动
- * 路径没有改变，但是我也没有去单独创建一个 Const 类来专门存放这些常量
+ * 这是一个抽象类，传入 binaryName 就能完成全部操作
+ * 这个类用来检查二进制文件是否存在
+ * 在常见的路径和环境变量的路径中查找它们
+ * 以及 which binaryName
  */
-public final class MagiskDetector extends AbstractDetector {
-    private static final String TAG = "MagiskDetector";
+public abstract class AbstractBinaryDetector extends AbstractDetector {
+    private static final String TAG = "AbstractBinaryDetector";
+    private final String binaryName;
 
-    // 这些是可能的静态路径
-    // 那肯定考虑到不同系统不同root方式不一样，但是肯定是加入了环境变量的，所以应该把环境变量也加入进去
-    private static final String[] MAGISK_PATHS = {
+    private static final String[] KNOWN_COMMON_PATHS = {
         "/data/local/",
         "/data/local/bin/",
         "/data/local/xbin/",
@@ -49,34 +50,35 @@ public final class MagiskDetector extends AbstractDetector {
         "/data/adb/"
     };
 
-    public MagiskDetector() {
-        super("magisk", DetectionCategory.ROOT);
+    public AbstractBinaryDetector(@NotNull String id, @NotNull String binaryName) {
+        super(id, DetectionCategory.ROOT);
+        this.binaryName = binaryName;
     }
 
     @Override
     protected DetectionResult doDetect(Context context) {
         List<DetectionEvidence> evidences = new ArrayList<>();
         // 查找常见路径以及环境变量看看有没有 magisk 文件
-        for (String path : /* MAGISK_PATHS */ getAllMagiskPaths()) {
-            path = path + "magisk";
+        for (String path : /* KNOWN_COMMON_PATHS */ getAllPaths()) {
+            path = path + binaryName;
             File file = new File(path);
             if (file.exists()) {
                 evidences.add(new DetectionEvidence(
-                    "MAGISK_PATH",
+                    binaryName.toUpperCase() + "_PATH",
                     path,
-                    "发现 magisk 文件"
+                    "发现 " + binaryName + " 文件"
                 ));
             }
         }
 
-        // 查看 which magisk 的结果
-        // Log.e(TAG, "[" + getWhichMagiskResult() + "]");
-        String whichMagisk = getWhichMagiskResult();
-        if (whichMagisk != null) {
+        // 查看 which binaryName 的结果
+        // Log.e(TAG, "[" + getWhichBinaryNameResult() + "]");
+        String whichBinaryName = getWhichBinaryNameResult(binaryName);
+        if (whichBinaryName != null) {
             evidences.add(new DetectionEvidence(
-                "WHICH_MAGISK",
-                whichMagisk,
-                "执行 which magisk 发现 magisk 文件"
+                "WHICH_" + binaryName.toUpperCase(),
+                whichBinaryName,
+                "执行 which " + binaryName + " 发现 " + binaryName + " 文件"
             ));
         }
 
@@ -98,10 +100,10 @@ public final class MagiskDetector extends AbstractDetector {
         );
     }
 
-    private static List<String> getAllMagiskPaths() {
-        List<String> paths = new ArrayList<>(Arrays.asList(MAGISK_PATHS));
+    private static List<String> getAllPaths() {
+        List<String> paths = new ArrayList<>(Arrays.asList(KNOWN_COMMON_PATHS));
         // 拆解一下
-        // 因为不同手机的可执行文件的目录是有差别的，MAGISK_PATHS 只是涵盖一些普通情况和一些极端情况
+        // 因为不同手机的可执行文件的目录是有差别的，KNOWN_COMMON_PATHS 只是涵盖一些普通情况和一些极端情况
         // 读取系统的 PATH 才能真正知道所有的可执行目录中哪
         String systemPaths = System.getenv("PATH");
         if (systemPaths == null || systemPaths.isEmpty()) {
@@ -120,12 +122,12 @@ public final class MagiskDetector extends AbstractDetector {
     }
 
     /**
-     * which magisk 的结果
+     * which binaryName 的结果
      * @return 如果命令执行成功，那么返回命令输出的内容，否则返回 null
      */
-    private static String getWhichMagiskResult() {
+    private static String getWhichBinaryNameResult(@NotNull String binaryName) {
         try {
-            Process process = Runtime.getRuntime().exec(new String[]{"which", "magisk"});
+            Process process = Runtime.getRuntime().exec(new String[]{"which", binaryName});
             try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream()))) {
                 return reader.readLine();

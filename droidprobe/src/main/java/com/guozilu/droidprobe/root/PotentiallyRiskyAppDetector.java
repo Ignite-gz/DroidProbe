@@ -39,6 +39,9 @@ public final class PotentiallyRiskyAppDetector extends AbstractDetector {
         "com.wn.app.np",
         "player.normal.np",
 
+        // Termux
+        "com.termux",
+
         // 算法助手
         "com.junge.algorithmaide",
 
@@ -60,7 +63,7 @@ public final class PotentiallyRiskyAppDetector extends AbstractDetector {
         "org.lsposed.manager",
 
         // LSPatch
-        "org.lsposed.lspatch",  // LSPatch 不需要 root，但我们还是把它加入了
+        "org.lsposed.lspatch",  // LSPatch 不需要 root 就能 hook，但我们还是把它加入了
 
         // VirtualXposed
         "io.va.exposed",
