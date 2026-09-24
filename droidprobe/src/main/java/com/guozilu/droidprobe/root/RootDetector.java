@@ -18,7 +18,8 @@ public class RootDetector extends CompositeDetector {
             new RootAppDetector(),
             new PotentiallyRiskyAppDetector(),
             new SuDetector(),
-            new SystemPropertyDetector()
+            new SystemPropertyDetector(),
+            new MountDetector()
         ));
     }
 

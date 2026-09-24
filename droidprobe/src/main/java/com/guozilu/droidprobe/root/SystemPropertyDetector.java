@@ -74,8 +74,8 @@ public final class SystemPropertyDetector extends AbstractDetector {
             }
         }
         else {  // 有一个或者两个没读取到
-            detectionStatus = DetectionStatus.DETECTED;
-            riskLevel = RiskLevel.LOW;
+            detectionStatus = DetectionStatus.UNKNOWN;
+            riskLevel = RiskLevel.UNKNOWN;
             evidences.add(new DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.debuggable, ro.secure",
@@ -83,6 +83,7 @@ public final class SystemPropertyDetector extends AbstractDetector {
             ));
 
             if (debuggable != null && debuggable.equals("1")) { // 读取到了 debuggable
+                detectionStatus = DetectionStatus.DETECTED;
                 riskLevel = RiskLevel.CRITICAL;
                 evidences.add(new DetectionEvidence(
                     "SYSTEM_PROPERTY",
@@ -91,6 +92,7 @@ public final class SystemPropertyDetector extends AbstractDetector {
                 ));
             }
             else if (secure != null && secure.equals("0")) {    // 读取到了 secure
+                detectionStatus = DetectionStatus.DETECTED;
                 riskLevel = RiskLevel.CRITICAL;
                 evidences.add(new DetectionEvidence(
                     "SYSTEM_PROPERTY",
@@ -102,6 +104,7 @@ public final class SystemPropertyDetector extends AbstractDetector {
 
         // 最后再判断 ro.build.type == user 的问题
         if (!Build.TYPE.equals("user")) {   // TYPE = getString("ro.build.type")
+            detectionStatus = DetectionStatus.DETECTED;
             riskLevel = RiskLevel.CRITICAL;
             evidences.add(new DetectionEvidence(
                 "SYSTEM_PROPERTY",
@@ -123,16 +126,18 @@ public final class SystemPropertyDetector extends AbstractDetector {
         String secure = SystemPropertiesUtils.getprop("ro.secure");
 
         // 按道理来说是读不到的
-        if (debuggable != null || secure != null) {
-            detectionStatus = DetectionStatus.DETECTED;
-            riskLevel = RiskLevel.LOW;
+        if (debuggable != null || secure != null) { // 读到了反而有点奇怪
+            detectionStatus = DetectionStatus.UNKNOWN;
+            riskLevel = RiskLevel.UNKNOWN;
             evidences.add(new DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.debuggable, ro.secure",
                 "高版本 Android 读取到了预期的系统属性"
             ));
 
+
             if (debuggable != null && debuggable.equals("1")) {
+                detectionStatus = DetectionStatus.DETECTED;
                 riskLevel = RiskLevel.CRITICAL;
                 evidences.add(new DetectionEvidence(
                     "SYSTEM_PROPERTY",
@@ -142,6 +147,7 @@ public final class SystemPropertyDetector extends AbstractDetector {
             }
 
             if (secure != null && secure.equals("0")) {
+                detectionStatus = DetectionStatus.DETECTED;
                 riskLevel = RiskLevel.CRITICAL;
                 evidences.add(new DetectionEvidence(
                     "SYSTEM_PROPERTY",

@@ -6,7 +6,7 @@
 
 #include <sys/system_properties.h>
 
-std::string get_system_property(const char* key) {
+std::string DroidProbe::get_system_property(const char* key) {
     if (key == nullptr) {
         return {};
     }

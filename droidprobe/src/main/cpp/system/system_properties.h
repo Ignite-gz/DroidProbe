@@ -7,6 +7,8 @@
 
 #include <string>
 
-std::string get_system_property(const char* key);
+namespace DroidProbe {
+    std::string get_system_property(const char *key);
+}
 
 #endif //DROIDPROBE_SYSTEM_PROPERTIES_H
