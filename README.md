@@ -21,6 +21,8 @@ DroidProbe 是一个用于检测 Android 设备运行环境、应用运行环境
 
 DroidProbe 作为一个 Library 对外提供统一的检测 API，示例 App 负责调用这些 API，并将检测结果展示出来。
 
+项目暂且仅部分完成，敬请期待......
+
 ---
 
 ## 核心设计
