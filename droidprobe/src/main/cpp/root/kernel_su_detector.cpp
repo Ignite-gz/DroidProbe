@@ -10,6 +10,7 @@
 #include <sys/prctl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <android/api-level.h>
 #include "droid_probe_log.h"
 
@@ -38,7 +39,6 @@ static bool IsKernelVersionSupportedForKsu() {
     return true;
 }
 
-
 void DroidProbe::KernelSuScanner::AddJavaEvidence(JNIEnv* env, jobject list, jclass list_cls,
                                                   jmethodID list_add_mid, jclass ev_cls,
                                                   jmethodID ev_ctor_mid, const char* type,
@@ -61,22 +61,67 @@ void DroidProbe::KernelSuScanner::AddJavaEvidence(JNIEnv* env, jobject list, jcl
     env->DeleteLocalRef(ev_obj);
 }
 
-int DroidProbe::KernelSuScanner::CheckSyscallAnomaly(JNIEnv* env, jobject list,
-                                                     jclass list_cls, jmethodID list_add_mid,
-                                                     jclass ev_cls, jmethodID ev_ctor_mid) {
-    // 为什么查 prctl？KernelSU 为了与上层 APP 通信，会劫持内核的 prctl
-    // 我们向其发送一个非法的高位命令。正常内核必定报错 EINVAL (无效参数)
-    int ksu_magic_cmd = 0xDEADBEEF;
-    errno = 0;
-    int ret = prctl(ksu_magic_cmd, 0, 0, 0, 0);
-
-    // 异常判定：没有返回 -1，或者返回了 -1 但错误码被吃掉了，说明被 Hook 了
-    if (ret >= 0 || errno != EINVAL) {
-        AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-            "SYSCALL_ANOMALY", "prctl", "检测到 prctl 内核调用被劫持");
-        return 80; // 极高危，直接实锤
+int DroidProbe::KernelSuScanner::CheckSyscallAnomaly(JNIEnv* env, jobject list, jclass list_cls,
+                                                     jmethodID list_add_mid, jclass ev_cls,
+                                                     jmethodID ev_ctor_mid) {
+    // 防御性校验：避免空指针导致 JNI 崩溃
+    if (!env || !list || !list_cls || !list_add_mid || !ev_cls || !ev_ctor_mid) {
+        return 0;
     }
-    return 0;
+
+    int max_score = 0;
+
+    // ------------------------------------------------------------------------
+    // 探针 1: prctl 多 Magic 码碰撞检测 (Seccomp 安全)
+    // ------------------------------------------------------------------------
+    // 收集 KernelSU / APatch / Suki 等常见内核 Hook 使用的 Magic 选项值
+    const std::vector<int> ksu_magics = {
+        static_cast<int>(0xDEADBEEF),
+        0x4321FEDC,
+        0x20230222,
+        0x11223344
+    };
+
+    for (int magic : ksu_magics) {
+        errno = 0;
+        int ret = prctl(magic, 0, 0, 0, 0);
+
+        // 原生内核对于未知的 prctl option，必定返回 -1 且 errno 为 EINVAL (22)
+        // 如果返回 >= 0，或者错误码不是 EINVAL，说明 prctl 逻辑已被内核 Hook 篡改
+        if (ret >= 0 || (ret == -1 && errno != EINVAL)) {
+            AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
+                "SYSCALL_PRCTL_HOOK", "prctl",
+                "检测到 prctl 系统调用行为异常，内核逻辑已被篡改");
+            max_score = std::max(max_score, 80);
+            break;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 探针 2: faccessat 模式参数校验探针 (Seccomp 安全，替代 reboot)
+    // ------------------------------------------------------------------------
+    // 逻辑：向 faccessat 传入非法的 mode (如 0xFFFFFFFF) 检查内核响应。
+    // 原生内核在解析路径前就会校验 mode 参数，必须返回 EINVAL (22)。
+    // 某些粗糙的内核 Hook 可能会优先做路径挂钩或权限判断，从而返回 ENOENT (2) 或 EACCES (13)。
+    errno = 0;
+    int faccess_ret = faccessat(AT_FDCWD, "/data/adb/ksu", 0xFFFFFFFF, 0);
+
+    if (faccess_ret == 0) {
+        // 非法 mode 竟然返回成功，绝对存在内核 Hook
+        AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
+            "SYSCALL_FACCESSAT_BYPASS", "faccessat",
+            "严重异常：faccessat 传入非法 mode 依然返回成功");
+        max_score = std::max(max_score, 85);
+    }
+    else if (errno != EINVAL) {
+        // 如果错误码不是 EINVAL（比如变成了 ENOENT 或 EACCES），说明 Hook 函数提前拦截并处理了路径
+        AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
+            "SYSCALL_FACCESSAT_HOOK", "faccessat",
+            "检测到 faccessat 系统调用返回码异常，存在内核 Hook 拦截痕迹");
+        max_score = std::max(max_score, 70);
+    }
+
+    return max_score;
 }
 
 int DroidProbe::KernelSuScanner::CheckAbstractSockets(JNIEnv* env, jobject list, jclass list_cls,
