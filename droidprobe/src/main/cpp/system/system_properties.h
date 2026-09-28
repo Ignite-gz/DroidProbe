@@ -8,7 +8,9 @@
 #include <string>
 
 namespace DroidProbe {
-    std::string get_system_property(const char *key);
-}
+    namespace System {
+        std::string get_system_property(const char *key);
+    } // namespace System
+} // namespace DroidProbe
 
 #endif // DROIDPROBE_SYSTEM_PROPERTIES_H

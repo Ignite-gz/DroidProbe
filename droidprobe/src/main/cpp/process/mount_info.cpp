@@ -28,10 +28,10 @@ namespace {
         }
 
         return result;
-    }
+    } /* unescape_mount_field */
 
     // 把 /proc/self/mountinfo 文件的一行内容解析为 MountInfo 对象
-    bool parse_mountinfo_line(const std::string& line, DroidProbe::MountInfo& mount_info) {
+    bool parse_mountinfo_line(const std::string& line, DroidProbe::Process::MountInfo& mount_info) {
         // 匹配格式：... mount_point mount_options ... - filesystem_type mount_source super_options
         // 因为 mountinfo 格式的第七列是数量不固定的“可选字段”
         // 用 .*? 非贪婪匹配（表示匹配任意字符，但尽可能少地匹配，直到遇到后面的 \s+-\s+ 为止）
@@ -48,10 +48,10 @@ namespace {
         }
 
         return false;
-    }
+    } /* parse_mountinfo_line */
 
     // 把 /proc/self/mountinfo 文件的内容解析为 MountInfo 数组
-    bool read_mount_info(std::vector<DroidProbe::MountInfo>& mount_infos) {
+    bool read_mount_info(std::vector<DroidProbe::Process::MountInfo>& mount_infos) {
         std::ifstream fin(kMountInfoPath, std::ios_base::in);
 
         if (!fin.is_open()) {
@@ -60,17 +60,17 @@ namespace {
 
         std::string line;
         while (std::getline(fin, line)) {
-            DroidProbe::MountInfo mount_info;
+            DroidProbe::Process::MountInfo mount_info;
             if (parse_mountinfo_line(line, mount_info)) {
                 mount_infos.push_back(std::move(mount_info));
             }
-        }
+        } /* while */
 
         return true;
-    }
+    } /* read_mount_info */
 
     // 把 /proc/self/mounts 文件的一行内容解析为 MountInfo 对象
-    bool parse_mounts_line(const std::string& line, DroidProbe::MountInfo& mount_info) {
+    bool parse_mounts_line(const std::string& line, DroidProbe::Process::MountInfo& mount_info) {
         // 匹配格式：source mount_point filesystem_type options
         const std::regex re(R"(^(\S+)\s+(\S+)\s+(\S+)\s+(\S+))");
         std::smatch match;
@@ -85,10 +85,10 @@ namespace {
         }
 
         return false;
-    }
+    } /* parse_mounts_line */
 
     // 把 /proc/self/mounts 文件的内容解析为 MountInfo 数组
-    bool read_mounts(std::vector<DroidProbe::MountInfo>& mount_infos) {
+    bool read_mounts(std::vector<DroidProbe::Process::MountInfo>& mount_infos) {
         std::ifstream file(kMountsPath);
 
         if (!file.is_open()) {
@@ -97,18 +97,18 @@ namespace {
 
         std::string line;
         while (std::getline(file, line)) {
-            DroidProbe::MountInfo mount_info;
+            DroidProbe::Process::MountInfo mount_info;
 
             if (parse_mounts_line(line, mount_info)) {
                 mount_infos.push_back(std::move(mount_info));
             }
-        }
+        } /* while */
 
         return true;
-    }
+    } /* read_mounts */
 
     // 解析 mount 命令输出的行为 MountInfo 对象
-    bool parse_mount_command_line(const std::string& line, DroidProbe::MountInfo& mount_info) {
+    bool parse_mount_command_line(const std::string& line, DroidProbe::Process::MountInfo& mount_info) {
         // 兼容新格式: "source on mount_point type filesystem_type (options)"
         // 新格式使用关键字 “on” 隔离两个字段，()包裹 options，所以使用 .+? 和 .+ 来匹配它们（字段可能中间有空格，保险起见没用 \S+）
         const std::regex re_new(R"(^(.+?)\s+on\s+(.+?)\s+type\s+(\S+)\s+\((.+)\)$)");
@@ -118,25 +118,25 @@ namespace {
 
         std::smatch match;
         if (std::regex_search(line, match, re_new)) {
-            mount_info.mount_source     = unescape_mount_field(match[1].str());
-            mount_info.mount_point      = unescape_mount_field(match[2].str());
-            mount_info.filesystem_type  = unescape_mount_field(match[3].str());
-            mount_info.mount_options    = unescape_mount_field(match[4].str());
+            mount_info.mount_source = unescape_mount_field(match[1].str());
+            mount_info.mount_point = unescape_mount_field(match[2].str());
+            mount_info.filesystem_type = unescape_mount_field(match[3].str());
+            mount_info.mount_options = unescape_mount_field(match[4].str());
             mount_info.super_options.clear();
             return true;
         }
         else if (std::regex_search(line, match, re_old)) {
-            mount_info.mount_source     = unescape_mount_field(match[1].str());
-            mount_info.mount_point      = unescape_mount_field(match[2].str());
-            mount_info.filesystem_type  = unescape_mount_field(match[3].str());
-            mount_info.mount_options    = unescape_mount_field(match[4].str());
+            mount_info.mount_source = unescape_mount_field(match[1].str());
+            mount_info.mount_point = unescape_mount_field(match[2].str());
+            mount_info.filesystem_type = unescape_mount_field(match[3].str());
+            mount_info.mount_options = unescape_mount_field(match[4].str());
             mount_info.super_options.clear();
             return true;
         }
         return false;
-    }
+    } /* parse_mount_command_line */
 
-    bool execute_mount(std::vector<DroidProbe::MountInfo>& mount_infos) {
+    bool execute_mount(std::vector<DroidProbe::Process::MountInfo>& mount_infos) {
         FILE* pipe = popen("mount", "r");
 
         if (pipe == nullptr) {
@@ -148,19 +148,18 @@ namespace {
             std::string line(buffer);
 
             if (!line.empty() && line.back() == '\n') {
-                DroidProbe::MountInfo mount_info;
+                DroidProbe::Process::MountInfo mount_info;
                 if (parse_mount_command_line(line, mount_info)) {
                     mount_infos.push_back(std::move(mount_info));
                 }
             }
-        }
+        } /* while */
 
         return pclose(pipe) == 0;
-    }
-}
+    } /* execute_mount */
+} // namespace
 
-
-bool DroidProbe::get_mounts(std::vector<MountInfo>& mounts) {
+bool DroidProbe::Process::get_mounts(std::vector<MountInfo>& mounts) {
     mounts.clear();
 
     // 第一优先级：

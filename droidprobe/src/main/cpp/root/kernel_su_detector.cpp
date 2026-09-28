@@ -3,236 +3,618 @@
 //
 
 #include "kernel_su_detector.h"
-
-#include <cerrno>
-#include <fstream>
-#include <string>
-#include <sys/prctl.h>
-#include <sys/utsname.h>
 #include <unistd.h>
-#include <android/api-level.h>
-#include "droid_probe_log.h"
+#include <fcntl.h>
+#include <cerrno>
+#include <sys/stat.h>
+#include <sstream>
+#include <sys/utsname.h>
+#include <sys/prctl.h>
 
-/**
-* 查看 Kernel Su 的运行环境要求，发现它必须运行中 Linux 内核版本高于 4.14 的环境中
-* 这个函数就是检查当前 Linux 内核版本是否 >= 4.14
-* @return 如果当前 Linux 内核版本大于等于 4.14 返回 true，否则返回 false
-*/
-static bool IsKernelVersionSupportedForKsu() {
-    struct utsname buf{};
-    if (uname(&buf) != 0) {
-        // 如果获取失败，出于防御性编程考量，默认认为可能支持，继续向下执行检测
-        return true;
-    }
-
-    int major = 0;
-    int minor = 0;
-    // buf.release 格式通常为 "4.14.180-gabcdef" 或 "5.10.101-android12-..."
-    if (sscanf(buf.release, "%d.%d", &major, &minor) == 2) {
-        if (major < 4 || (major == 4 && minor < 14)) {
-            // 内核版本 < 4.14，物理上不可能运行 KernelSU
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-void DroidProbe::KernelSuScanner::AddJavaEvidence(JNIEnv* env, jobject list, jclass list_cls,
-                                                  jmethodID list_add_mid, jclass ev_cls,
-                                                  jmethodID ev_ctor_mid, const char* type,
-                                                  const char* value, const char* description) {
-    // 1. 在 JNI 中创建 Java 的 String 对象
-    jstring j_type = env->NewStringUTF(type);
-    jstring j_value = env->NewStringUTF(value);
-    jstring j_description = env->NewStringUTF(description);
-
-    // 2. 实例化 com.guozilu.droidprobe.core.DetectionEvidence
-    jobject ev_obj = env->NewObject(ev_cls, ev_ctor_mid, j_type, j_value, j_description);
-
-    // 3. 将新创建的 Evidence 对象添加到 Java 的 ArrayList 中 (调用 List.add)
-    env->CallBooleanMethod(list, list_add_mid, ev_obj);
-
-    // 4. 销毁局部引用，防止 JNI 表容量爆满导致抛出 JNI Local Reference Table Overflow 崩溃
-    env->DeleteLocalRef(j_type);
-    env->DeleteLocalRef(j_value);
-    env->DeleteLocalRef(j_description);
-    env->DeleteLocalRef(ev_obj);
-}
-
-int DroidProbe::KernelSuScanner::CheckSyscallAnomaly(JNIEnv* env, jobject list,
-                                                     jclass list_cls, jmethodID list_add_mid,
-                                                     jclass ev_cls, jmethodID ev_ctor_mid) {
-    // 为什么查 prctl？KernelSU 为了与上层 APP 通信，会劫持内核的 prctl
-    // 我们向其发送一个非法的高位命令。正常内核必定报错 EINVAL (无效参数)
-    int ksu_magic_cmd = 0xDEADBEEF;
-    errno = 0;
-    int ret = prctl(ksu_magic_cmd, 0, 0, 0, 0);
-
-    // 异常判定：没有返回 -1，或者返回了 -1 但错误码被吃掉了，说明被 Hook 了
-    if (ret >= 0 || errno != EINVAL) {
-        AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-            "SYSCALL_ANOMALY", "prctl", "检测到 prctl 内核调用被劫持");
-        return 80; // 极高危，直接实锤
-    }
-    return 0;
-}
-
-int DroidProbe::KernelSuScanner::CheckAbstractSockets(JNIEnv* env, jobject list, jclass list_cls,
-                                                      jmethodID list_add_mid, jclass ev_cls,
-                                                      jmethodID ev_ctor_mid) {
-    // 1. 获取当前系统 Android API Level
-    int api_level = android_get_device_api_level();
-
-    errno = 0;
-    std::ifstream fin("/proc/net/unix", std::ios_base::in);
-
-    // 【场景 1】：无法打开文件
-    if (!fin.is_open()) {
-        // 在 Android 10+ (API 29+) 上，EACCES (13) 属于受 SELinux 保护的纯净系统正常现象
-        return 0;
-    }
-
-    int max_score = 0;
-
-    // 【场景 2】：成功打开了 /proc/net/unix
-    // 判定 A：SELinux 越权检测 (仅针对 Android 10+)
-    if (api_level >= __ANDROID_API_Q__) {
-        AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-            "SELINUX_PROC_NET_BYPASS", "/proc/net/unix",
-            "SELinux 隔离失效：普通 App 越权读取了 /proc/net/unix");
-        max_score = 60; // SELinux 被解封/穿透，标记为高危
-    }
-
-    // 判定 B：扫描套接字表，寻找 KernelSU 的 IPC 守护进程特征
-    std::string line;
-    // 跳过表头
-    if (std::getline(fin, line)) {
-        while (std::getline(fin, line)) {
-            std::string_view sv(line);
-
-            // 匹配 KSU 常见的抽象套接字名称（@ksud 或 @kernelsu）
-            if (sv.find("@ksud") != std::string_view::npos ||
-                sv.find("@kernelsu") != std::string_view::npos) {
-
-                std::string socketInfo = "unix_socket: " + line;
-                AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-                    "ABSTRACT_SOCKET_MATCH", socketInfo.c_str(),
-                    "捕获到 KernelSU IPC 守护进程套接字");
-
-                // 抓到了确凿的 KSU 运行特征，直接提升为 80 分
-                max_score = 80;
-            }
-        }
-    }
-
-    // 如果能 open 成功（Android 10+），但没找到具体的 @ksud 字符串，返回 SELinux 异常分 (60 分)
-    // 如果是 Android 9 及以下，能 open 且没找到 ksu 字符串，返回 0 分
-    return max_score;
-}
-
-
-int DroidProbe::KernelSuScanner::CheckSuspiciousFiles(JNIEnv* env, jobject list, jclass list_cls,
-                                                      jmethodID list_add_mid, jclass ev_cls,
-                                                      jmethodID ev_ctor_mid) {
-    const std::vector<const char *> ksu_paths = {
-        "/data/adb/ksu",
+namespace {
+    /**
+     * KernelSU 相关候选路径。
+     *
+     * <p>这些路径用于识别文件系统中可见的组件痕迹，不代表 KernelSU 的稳定 ABI。
+     * 其中 /data/adb/ksud 是上游 KernelSU 用户态守护程序常见路径；allowlist 的存储路径、
+     * 安装布局以及是否对普通应用可见，会随版本、分支和 ROM 配置发生变化。</p>
+     *
+     * <p>检查结果只表示 stat() 成功、当前应用能够读取该路径的元数据；绝不能将
+     * ENOENT 解读为权限绕过，也不能把 EACCES 当成设备干净的证明。</p>
+     */
+    constexpr const char* kKsuPaths[] = {
         "/data/adb/ksud",
-        "/data/adb/modules/kernelsu"
+        "/data/adb/ksu",
+        "/data/adb/ksu/.allowlist"
     };
 
-    int max_score = 0;
+    /**
+     * /proc/net/unix 中可能出现的候选名称。
+     *
+     * <p>抽象 Unix Socket 名称不是 KernelSU 的稳定公开接口。这里仅保留原型阶段
+     * 使用的候选字符串，并将其作为中低置信度线索；发布前必须针对目标 KernelSU
+     * 版本实测确认。若目标版本不使用这些名称，应更新或禁用此候选列表。</p>
+     */
+    constexpr const char* kCandidateSocketNames[] = {
+        "@ksud",
+        "@kernelsu"
+    };
 
-    for (const char *path: ksu_paths) {
-        errno = 0;
-        int res = access(path, F_OK);
+    /**
+     * 仅对精确的候选内核模块名进行匹配，避免在任意模块描述中做宽泛子串搜索。
+     * KernelSU 也可能以内建方式集成，因此没有模块条目不代表不存在 KernelSU。
+     */
+    constexpr const char* kCandidateModuleNames[] = {
+        "kernelsu",
+        "ksu"
+    };
 
-        if (res == 0) {
-            // 场景 1：成功访问到了文件/目录 (res == 0)
-            // 意味着：路径存在，且 App 越权获取了对 /data/adb/ 的读取权限（SELinux 被解封或进程被提权）
-            AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-                "KSU_PATH_ACCESSIBLE", path,
-                "KSU 目录存在且突破了系统的 DAC/MAC 隔离限制");
-            max_score = std::max(max_score, 80);
+    /** 每个探针的分值是启发式优先级，不是概率或统计置信度。 */
+    constexpr int kScoreKsuModule = 80;
+    constexpr int kScoreKsuKernelSymbol = 85;
+    constexpr int kScoreKsuPath = 60;
+    constexpr int kScoreCandidateSocket = 50;
+
+    /** procfs 文件读取上限，避免异常环境下无界读取。 */
+    constexpr size_t kMaxProcFileBytes = 16U * 1024U * 1024U;
+    constexpr size_t kMaxEvidencePerSource = 8U;
+    constexpr size_t kReadBufferSize = 4096U;
+
+    /**
+     * 有界文件读取状态。
+     *
+     * <p>procfs 是动态伪文件系统，普通文件的 seek/size 语义不一定适用，因而使用
+     * read() 顺序读取，并显式区分读取失败与读取被上限截断。</p>
+     */
+    struct ReadResult {
+        bool opened = false;
+        bool completed = false;
+        bool truncated = false;
+        int error_number = 0;
+        std::string content;
+    };
+
+    /**
+     * 使用 POSIX open/read 有界读取文件。
+     *
+     * @param path 待读取路径
+     * @param max_bytes 最大读取字节数
+     * @return 包含读取状态、errno 和文本内容的结果
+     */
+    ReadResult ReadTextFile(const char* path, size_t max_bytes) {
+        ReadResult result;
+        if (path == nullptr || max_bytes == 0U) {
+            result.error_number = EINVAL;
+            return result;
         }
-        else if (errno == ENOENT) {
-            // 场景 2：返回 ENOENT (2, 文件不存在)
-            // 正常情况下，DAC (0700) 会在父目录拦截并返回 EACCES (13)。
-            // 能拿到 ENOENT，说明 App 成功穿透了 /data/adb/ 目录！说明 SELinux/DAC 策略已被篡改（如 setenforce 0）
-            AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-                "SELINUX_PERMISSIVE_ANOMALY", path,
-                "文件不存在，但系统安全隔离失效：普通 App 越权穿透了敏感系统目录");
-            max_score = std::max(max_score, 60);
+
+        const int fd = open(path, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) {
+            result.error_number = errno;
+            return result;
         }
-        // 场景 3：errno == EACCES (13)
-        // 这是所有纯净 Android 版本（API 24 ~ API 35+）上的正常隔离表现，不作处理。
-    }
+        result.opened = true;
 
-    return max_score;
-}
+        char buffer[kReadBufferSize];
+        while (result.content.size() < max_bytes) {
+            const size_t remaining = max_bytes - result.content.size();
+            const size_t bytes_to_read = std::min(remaining, sizeof(buffer));
+            const ssize_t count = read(fd, buffer, bytes_to_read);
 
-int DroidProbe::KernelSuScanner::CheckKallsyms(JNIEnv* env, jobject list, jclass list_cls,
-                                               jmethodID list_add_mid, jclass ev_cls,
-                                               jmethodID ev_ctor_mid) {
-    int api_level = android_get_device_api_level();
+            if (count == 0) {
+                result.completed = true;
+                break;
+            }
+            if (count < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                result.error_number = errno;
+                break;
+            }
 
-    errno = 0;
-    std::ifstream fin("/proc/kallsyms", std::ios_base::in);
+            result.content.append(buffer, static_cast<size_t>(count));
+        } /* while */
 
-    // 判定 1：文件能够成功打开
-    if (fin.is_open()) {
-        int detected_score = 0;
-
-        // 在 Android 8.0+ (API 26+) 上，SELinux 严格禁止普通 App 打开 /proc/kallsyms
-        // 如果成功 open，说明 SELinux 已经被关闭(Permissive) 或 策略被全局 Patch 穿透
-        if (api_level >= __ANDROID_API_O__) {
-            AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-                "SELINUX_KALLSYMS_BYPASS", "/proc/kallsyms",
-                "SELinux 隔离异常：普通 App 越权打开了 /proc/kallsyms");
-            detected_score = 60; // SELinux 被破防，定性为高危
+        if (result.opened && !result.completed && result.error_number == 0
+            && result.content.size() >= max_bytes) {
+            // 达到读取上限时，不继续消耗资源；调用方应将该数据源标记为不完整。
+            result.truncated = true;
         }
 
-        // 判定 2：读取内容，检查是否存在 KSU 注入符号
-        std::string line;
-        while (std::getline(fin, line)) {
-            // 过滤 ksu_ 或 kernelsu_ 关键字
-            if (line.find(" ksu_") != std::string::npos ||
-                line.find(" kernelsu_") != std::string::npos) {
-                AddJavaEvidence(env, list, list_cls, list_add_mid, ev_cls, ev_ctor_mid,
-                    "KALLSYMS_KSU_SYMBOL", "/proc/kallsyms",
-                    "在内核符号表中捕获到 KernelSU 注入函数");
-                return 80; // 抓到了具体的内核函数，实锤，直接返回最高分 80
+        close(fd);
+        return result;
+    } /* ReadTextFile */
+
+    /**
+     * 将检测证据追加到结果中，并更新最高命中分值。
+     *
+     * <p>同一类型和值的证据只保留一次；多项证据不累加，而是取最高分，避免相关
+     * 信号被重复计算后夸大风险等级。</p>
+     */
+    void AddEvidence(DroidProbe::Root::KernelSuScanResult& result, int score, const char* type,
+                     const std::string& value, const char* description) {
+        if (type == nullptr || description == nullptr) {
+            return;
+        }
+
+        for (const auto& existing : result.evidences) {
+            // 发现重复条目
+            if (existing.type == type && existing.value == value) {
+                result.risk_score = std::max(result.risk_score, score);
+                return;
             }
         }
 
-        // 如果 open 成功但没扫到 ksu_ 符号（可能被抹除名目），仍然返回 SELinux 异常分
-        return detected_score > 0 ? detected_score : 60;
+        result.evidences.push_back(std::move(DroidProbe::Root::KernelSuEvidence{type, value, description}));
+        result.risk_score = std::max(result.risk_score, score);
+    } /* AddEvidence */
+
+    /**
+     * 将数据源不可观测或读取不完整的情况作为诊断证据记录。
+     *
+     * <p>可访问性问题本身不是 KernelSU 证据，因此 score 固定为 0；它只会影响
+     * 最终扫描状态，使“未发现”与“无法确认”能够被区分。</p>
+     */
+    void AddScanLimitation(DroidProbe::Root::KernelSuScanResult& result, const char* source,
+                           const char* reason) {
+        result.state = DroidProbe::Root::KernelSuScanState::INCOMPLETE;
+        AddEvidence(
+            result,
+            0,
+            "SCAN_LIMITATION",
+            source == nullptr ? "unknown" : source,
+            reason == nullptr ? "检测数据源不可用" : reason
+        );
+    } /* AddScanLimitation */
+
+    /**
+     * 判断 errno 是否表示路径不可访问。
+     * EACCES/EPERM 代表当前调用者缺少访问权限，不代表目标不存在或系统已被篡改。
+     */
+    bool IsPermissionError(int error_number) {
+        return error_number == EACCES || error_number == EPERM;
+    } /* IsPermissionError */
+
+    /**
+     * 检查已知 KernelSU 文件系统路径。
+     *
+     * <p>仅当 stat() 成功时报告“路径存在”。ENOENT 只表示路径当前不可解析，
+     * 不作风险加分；EACCES/EPERM 表示无法判断路径是否存在，扫描状态记为不完整。</p>
+     */
+    void CheckKsuPaths(DroidProbe::Root::KernelSuScanResult& result) {
+        for (const char* path : kKsuPaths) {
+            struct stat file_status{};
+            errno = 0;
+
+            if (stat(path, &file_status) == 0) {
+                AddEvidence(
+                    result,
+                    kScoreKsuPath,
+                    "KSU_PATH_EXISTS",
+                    path,
+                    "发现候选 KernelSU 路径且当前进程能够读取其元数据；"
+                    "该路径可能是安装或残留痕迹，不能单独证明内核功能正在运行"
+                );
+                continue;
+            }
+
+            const int error_number = errno;
+            if (IsPermissionError(error_number)) {
+                AddScanLimitation(
+                    result,
+                    path,
+                    "当前应用无权检查该候选路径，无法判断其是否存在；"
+                    "权限拒绝属于常见系统隔离行为，不作为 Root 阳性证据"
+                );
+            }
+            else if (error_number != ENOENT) {
+                AddScanLimitation(
+                    result,
+                    path,
+                    "检查候选路径时发生非预期文件系统错误，当前路径状态无法确认"
+                );
+            }
+        }
+    } /* CheckKsuPaths */
+
+    /**
+     * 从 /proc/modules 中识别精确匹配的 KernelSU 模块名。
+     *
+     * <p>/proc/modules 只列出作为可加载模块呈现的模块。KernelSU 若以内核源码
+     * 内建方式编译，可能不会出现在这里；因此无命中不是排除结论。</p>
+     */
+    void CheckProcModules(DroidProbe::Root::KernelSuScanResult& result) {
+        const ReadResult read_result = ReadTextFile("/proc/modules", kMaxProcFileBytes);
+        if (!read_result.opened) {
+            AddScanLimitation(
+                result,
+                "/proc/modules",
+                "无法打开 /proc/modules，可能受到 procfs 权限或系统策略限制"
+            );
+            return;
+        }
+        if (!read_result.completed || read_result.truncated) {
+            AddScanLimitation(
+                result,
+                "/proc/modules",
+                "读取 /proc/modules 不完整，模块列表扫描结果可能不完整"
+            );
+        }
+
+        std::istringstream input(read_result.content);
+        std::string line;
+        size_t evidence_count = 0;
+
+        while (std::getline(input, line)) {
+            std::istringstream line_stream(line);
+            std::string module_name;
+            if (!(line_stream >> module_name)) {
+                continue;
+            }
+
+            for (const char* candidate : kCandidateModuleNames) {
+                if (module_name == candidate) {
+                    AddEvidence(
+                        result,
+                        kScoreKsuModule,
+                        "KSU_MODULE_MATCH",
+                        module_name,
+                        "在 /proc/modules 中发现与 KernelSU 候选模块名完全匹配的条目；"
+                        "该信号较强，但仍应结合目标 ROM 和模块来源验证"
+                    );
+                    ++evidence_count;
+                    break;
+                }
+            }
+
+            if (evidence_count >= kMaxEvidencePerSource) {
+                break;
+            }
+        }
+    } /* CheckProcModules */
+
+    /**
+     * 判断一个 procfs Socket 路径字段是否精确匹配候选 KernelSU 名称。
+     *
+     * <p>不使用宽泛的 substring 搜索，防止普通 Socket 名称中偶然包含关键字而误报。
+     * 当前候选名称属于版本相关启发式特征，需在真实设备上验证。</p>
+     */
+    bool IsCandidateKsuSocket(const std::string& socket_name) {
+        for (const char* candidate : kCandidateSocketNames) {
+            if (socket_name == candidate) {
+                return true;
+            }
+        }
+        return false;
+    } /* IsCandidateKsuSocket */
+
+    /**
+     * 读取 /proc/net/unix 并检查抽象 Unix Socket 名称。
+     *
+     * <p>Linux /proc/net/unix 的最后一列通常包含 Socket 路径；抽象命名空间名称
+     * 常以 @ 表示。该文件是否允许普通应用读取取决于 Android 版本及安全策略。</p>
+     *
+     * <p>成功读取文件不是 SELinux 绕过或 KernelSU 的证据。只有实际命中候选名称
+     * 才记录低至中等强度的 KernelSU 线索；候选名称本身不是 KernelSU 的稳定 ABI。</p>
+     */
+    void CheckAbstractSockets(DroidProbe::Root::KernelSuScanResult& result) {
+        const ReadResult read_result = ReadTextFile("/proc/net/unix", kMaxProcFileBytes);
+        if (!read_result.opened) {
+            AddScanLimitation(
+                result,
+                "/proc/net/unix",
+                "当前应用无法读取 /proc/net/unix；此类限制在 Android 上可能是正常行为，"
+                "不能据此推断 KernelSU 存在或不存在"
+            );
+            return;
+        }
+        if (!read_result.completed || read_result.truncated) {
+            AddScanLimitation(
+                result,
+                "/proc/net/unix",
+                "读取 /proc/net/unix 不完整，Socket 扫描结果可能不完整"
+            );
+        }
+
+        std::istringstream input(read_result.content);
+        std::string line;
+        size_t evidence_count = 0;
+
+        // 第一行是字段标题；若文件为空或格式异常，则不产生阳性结论。
+        if (!std::getline(input, line)) {
+            AddScanLimitation(
+                result,
+                "/proc/net/unix",
+                "/proc/net/unix 内容为空，无法完成 Socket 特征扫描"
+            );
+            return;
+        }
+
+        while (std::getline(input, line)) {
+            std::istringstream line_stream(line);
+            std::string field;
+            std::string last_field;
+
+            // 按空白拆分字段，保留最后一列作为 Socket 路径候选。
+            while (line_stream >> field) {
+                last_field = field;
+            }
+
+            if (last_field.empty() || !IsCandidateKsuSocket(last_field)) {
+                continue;
+            }
+
+            AddEvidence(
+                result,
+                kScoreCandidateSocket,
+                "KSU_SOCKET_CANDIDATE",
+                last_field,
+                "命中候选 KernelSU 抽象 Unix Socket 名称；"
+                "Socket 命名并非稳定公开接口，当前只作为待实机验证的辅助线索"
+            );
+
+            ++evidence_count;
+            if (evidence_count >= kMaxEvidencePerSource) {
+                break;
+            }
+        }
+    } /* CheckAbstractSockets */
+
+    /**
+     * 从 /proc/kallsyms 的符号名列提取候选 KernelSU 符号。
+     *
+     * <p>常见行格式为：地址、符号类型、符号名称，某些内核还会附加模块名。
+     * 本实现只检查符号名是否以 ksu_ 或 kernelsu_ 开头，而不是搜索整行子串，
+     * 从而减少地址、路径或其他字段造成的偶然命中。</p>
+     *
+     * <p>符号命中是比通用系统属性更具体的线索，但仍可能受源码版本、符号隐藏、
+     * 编译方式和厂商改动影响；它不是防篡改证明。</p>
+     */
+    void CheckKallsyms(DroidProbe::Root::KernelSuScanResult& result) {
+        const ReadResult read_result = ReadTextFile("/proc/kallsyms", kMaxProcFileBytes);
+        if (!read_result.opened) {
+            AddScanLimitation(
+                result,
+                "/proc/kallsyms",
+                "当前应用无法读取 /proc/kallsyms；内核符号表常受权限策略限制，该限制本身不是 KernelSU 证据"
+            );
+            return;
+        }
+        if (!read_result.completed || read_result.truncated) {
+            AddScanLimitation(
+                result,
+                "/proc/kallsyms",
+                "/proc/kallsyms 读取达到上限或中途失败，符号表扫描不完整"
+            );
+        }
+
+        std::istringstream input(read_result.content);
+        std::string line;
+        size_t evidence_count = 0;
+
+        while (std::getline(input, line)) {
+            std::istringstream line_stream(line);
+            std::string address;
+            std::string symbol_type;
+            std::string symbol_name;
+
+            if (!(line_stream >> address >> symbol_type >> symbol_name)) {
+                continue;
+            }
+
+            const bool is_ksu_symbol =
+                symbol_name.compare(0, 4, "ksu_") == 0 ||
+                symbol_name.compare(0, 8, "kernelsu_") == 0;
+            if (!is_ksu_symbol) {
+                continue;
+            }
+
+            AddEvidence(
+                result,
+                kScoreKsuKernelSymbol,
+                "KSU_KERNEL_SYMBOL",
+                symbol_name,
+                "在可读取的内核符号表中发现 KernelSU 命名特征；"
+                "该符号是具体内核线索，但应结合目标内核源码或已知版本进行确认"
+            );
+
+            ++evidence_count;
+            if (evidence_count >= kMaxEvidencePerSource) {
+                break;
+            }
+        }
+    } /* CheckKallsyms */
+
+    /**
+     * 获取内核版本字符串，仅作为诊断上下文。
+     *
+     * <p>上游 KernelSU 的兼容范围与分支、内核集成方式有关；低版本内核也可能存在
+     * 手动回移植或第三方分支。因此这里不以版本号硬性跳过探测，也不把版本号本身
+     * 作为 Root 阳性证据。</p>
+     */
+    void AddKernelVersionContext(DroidProbe::Root::KernelSuScanResult& result) {
+        struct utsname info {};
+        if (uname(&info) != 0) {
+            AddScanLimitation(
+                result,
+                "uname",
+                "uname() 获取内核版本失败，无法记录内核版本上下文"
+            );
+            return;
+        }
+
+        // 虽然官方表示 KernelSU 只能运行在 Linux 内核版本 4.14+ 的设备上，但一些其他版本的 KernelSU 是可以在地版本运行的
+        AddEvidence(
+            result,
+            0,
+            "KERNEL_VERSION_CONTEXT",
+            info.release,
+            "当前内核版本仅作为 KernelSU 兼容性分析上下文；不依据版本号单独判定设备是否安装或运行 KernelSU"
+        );
+    } /* AddKernelVersionContext */
+
+    /**
+     * @brief 探测 prctl 系统调用的异常响应，作为 KernelSU 相关的实验性辅助检测。
+     *
+     * @details
+     * 通过调用候选 prctl option，观察系统调用的返回值和 errno。
+     * 对于未知 option，常规 Linux 内核通常返回 -1 并设置 EINVAL。
+     *
+     * 注意：
+     * 1. 异常响应不等于 KernelSU 确证，也可能来自 seccomp、
+     *    厂商内核修改或其他内核扩展。
+     * 2. 仅保留已知的历史 KernelSU prctl 接口候选值；
+     *    其他未经源码验证的魔数不应直接用于正式检测。
+     * 3. 当前上游 KernelSU 已采用基于驱动文件描述符的 ioctl UAPI，
+     *    因此此探针主要覆盖历史 prctl 接口实现，不保证覆盖新版。
+     * 4. 本方法只记录弱证据，不单独将设备判定为 KernelSU 已安装。
+     *
+     * @param result KernelSU 扫描结果，检测证据直接追加到该对象
+     */
+    void CheckSyscallAnomaly(DroidProbe::Root::KernelSuScanResult& result) {
+        /**
+         * 历史 KernelSU prctl 接口候选值。
+         *
+         * 这里仅保留历史接口中使用过的 0xDEADBEEF。
+         * 其他未经目标版本源码验证的候选魔数不参与扫描，
+         * 避免将其他内核扩展的接口误认为 KernelSU。
+         *
+         * 注意：调用前仍应针对目标版本确认该 option 配合
+         * 零参数不会触发任何有副作用的操作。
+         */
+        struct PrctlProbe {
+            int option;
+            const char* name;
+        };
+
+        constexpr PrctlProbe probes[] = {
+            {
+                static_cast<int>(0xDEADBEEFu),
+                "LEGACY_KERNEL_SU_OPTION"
+            }
+        };
+
+        for (const PrctlProbe& probe : probes) {
+            // 每次调用前清空 errno，避免使用上一次系统调用遗留的错误码。
+            errno = 0;
+
+            // 使用零参数进行实验性探测。
+            // 此处不执行提权命令，不传入任何有效用户空间指针。
+            const int ret = prctl(
+                probe.option,
+                0,
+                0,
+                0,
+                0
+            );
+
+            // 立即保存 errno，避免后续函数调用覆盖它。
+            const int error = errno;
+
+            // 情况一：返回 EINVAL。
+            // 这是未知 prctl option 的常规响应。
+            // 但不能据此排除 KernelSU，因为目标版本可能不采用此接口，
+            // 也可能对非授权调用者隐藏接口行为。
+            if (ret == -1 && error == EINVAL) {
+                continue;
+            }
+
+            // 记录此次探测的原始响应，便于后续实机验证。
+            const std::string value =
+                std::string("option=") + probe.name
+                    + ",ret=" + std::to_string(ret)
+                    + ",errno=" + std::to_string(error);
+
+            // 情况二：系统调用成功。
+            // 这说明候选 option 得到了处理，但无法唯一归因于 KernelSU。
+            // 因此只作为低置信度辅助证据，不赋予确诊级分值。
+            if (ret >= 0) {
+                AddEvidence(
+                    result,
+                    20,
+                    "PRCTL_OPTION_HANDLED",
+                    value,
+                    "候选 prctl option 返回成功，可能存在内核扩展处理逻辑；"
+                    "该行为并非 KernelSU 独有，需结合其他证据验证"
+                );
+
+                // 当前仅有一个经过筛选的候选值，命中后结束探测。
+                return;
+            }
+
+            // 情况三：调用受到权限限制，或系统不支持该探测路径。
+            // EPERM、EACCES、ENOSYS 等错误都不能单独证明 KernelSU。
+            if (error == EPERM || error == EACCES || error == ENOSYS) {
+                AddEvidence(
+                    result,
+                    0,
+                    "PRCTL_PROBE_INCONCLUSIVE",
+                    value.c_str(),
+                    "候选 prctl 探测受到权限限制或接口不可用，"
+                    "无法据此判断是否存在 KernelSU"
+                );
+                continue;
+            }
+
+            // 情况四：其他非预期响应。
+            // 可能由内核版本差异、安全策略或其他内核扩展造成。
+            // 保留原始响应供调试，但不直接增加 KernelSU 风险分。
+            AddEvidence(
+                result,
+                0,
+                "PRCTL_UNEXPECTED_RESPONSE",
+                value,
+                "prctl 返回非预期错误，属于待验证的系统调用行为异常，"
+                "不能单独作为 KernelSU 检出证据"
+            );
+        }
+    } /* CheckSyscallAnomaly */
+} // namespace
+
+
+/**
+ * 执行 KernelSU 多维度特征扫描。
+ *
+ * <p>扫描仅采集当前进程能够访问的数据，不执行 su，不修改系统状态，也不尝试
+ * 调用可能改变管理器身份、授予 Root 权限或修改内核配置的 KernelSU 命令。</p>
+ *
+ * <p>探测数据源包括：</p>
+ * <ol>
+ *     <li>uname：记录内核版本，作为兼容性上下文。</li>
+ *     <li>/proc/modules：识别以模块形式加载、且名称精确匹配的候选条目。</li>
+ *     <li>/proc/net/unix：仅匹配明确列出的候选 Socket 名称。</li>
+ *     <li>已知文件路径：只在 stat 成功时记录存在，不对 ENOENT/EACCES 作越权推断。</li>
+ *     <li>/proc/kallsyms：在可读取时解析符号名列，查找 KSU 前缀特征。</li>
+ * </ol>
+ *
+ * <p>风险分值只取最高命中证据，不累加不同来源的弱信号。任何关键数据源不可读、
+ * 读取被截断或解析无法完成时，若没有阳性证据，结果状态为 INCOMPLETE，交由
+ * Java 层映射为 UNKNOWN。</p>
+ *
+ * @return Native 扫描结果
+ */
+DroidProbe::Root::KernelSuScanResult DroidProbe::Root::KernelSuScanner::Scan() {
+    KernelSuScanResult result;
+
+    try {
+        AddKernelVersionContext(result);
+        CheckProcModules(result);
+        CheckAbstractSockets(result);
+        CheckKsuPaths(result);
+        CheckKallsyms(result);
+        CheckSyscallAnomaly(result);
+    }
+    catch (...) {
+        result.state = KernelSuScanState::ERROR;
+        AddEvidence(
+            result,
+            0,
+            "NATIVE_SCAN_EXCEPTION",
+            "KernelSuScanner::Scan",
+            "Native 扫描过程中发生未预期异常，扫描结果可能不完整"
+        );
     }
 
-    // file.is_open() 为 false 且 errno == EACCES (13)，是 Android 8.0+ 的正常隔离表现
-    return 0;
-}
-
-int DroidProbe::KernelSuScanner::ScanAndReport(JNIEnv* env, jobject evidences) {
-    int total_score = 0;
-
-    jclass list_cls = env->GetObjectClass(evidences);
-    jmethodID list_add_mid = env->GetMethodID(list_cls, "add", "(Ljava/lang/Object;)Z");
-
-    jclass ev_cls = env->FindClass("com/guozilu/droidprobe/core/DetectionEvidence");
-    jmethodID ev_ctor_mid = env->GetMethodID(ev_cls, "<init>",
-        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
-
-    // --- 开始分层探测 ---
-    total_score += CheckSyscallAnomaly(env, evidences, list_cls, list_add_mid, ev_cls, ev_ctor_mid);
-    total_score += CheckAbstractSockets(env, evidences, list_cls, list_add_mid, ev_cls, ev_ctor_mid);
-    total_score += CheckSuspiciousFiles(env, evidences, list_cls, list_add_mid, ev_cls, ev_ctor_mid);
-    total_score += CheckKallsyms(env, evidences, list_cls, list_add_mid, ev_cls, ev_ctor_mid);
-
-    // 释放最外层的局部引用
-    env->DeleteLocalRef(list_cls);
-    env->DeleteLocalRef(ev_cls);
-
-    return total_score;
+    return result;
 }

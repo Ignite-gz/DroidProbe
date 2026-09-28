@@ -6,23 +6,23 @@
 
 #include <unistd.h>
 
-uid_t DroidProbe::get_process_uid() {
+uid_t DroidProbe::Process::get_process_uid() {
     return getuid();
 }
 
-uid_t DroidProbe::get_process_euid() {
+uid_t DroidProbe::Process::get_process_euid() {
     return geteuid();
 }
 
-gid_t DroidProbe::get_process_gid() {
+gid_t DroidProbe::Process::get_process_gid() {
     return getgid();
 }
 
-gid_t DroidProbe::get_process_egid() {
+gid_t DroidProbe::Process::get_process_egid() {
     return getegid();
 }
 
-std::vector<gid_t> DroidProbe::get_process_groups() {
+std::vector<gid_t> DroidProbe::Process::get_process_groups() {
     // 先获取当前进程补充组的数量
     int group_count = getgroups(0, nullptr);
     if (group_count <= 0) {
