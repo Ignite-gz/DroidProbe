@@ -57,12 +57,17 @@ public final class RootAppDetector extends AbstractDetector {
         "me.phh.superuser",
         "com.noshufou.android.su",
         "com.noshufou.android.su.elite",
+        "com.yellowes.su",
 
         // KingRoot
         "com.kingroot.kinguser",
 
         // Kingo Root
-        "com.kingo.root"
+        "com.kingo.root",
+
+        // RPC 框架
+        "com.sekiro",
+        "com.sekiro.rpc"
     };
 
     public RootAppDetector() {

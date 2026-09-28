@@ -11,4 +11,4 @@ namespace DroidProbe {
     std::string get_system_property(const char *key);
 }
 
-#endif //DROIDPROBE_SYSTEM_PROPERTIES_H
+#endif // DROIDPROBE_SYSTEM_PROPERTIES_H

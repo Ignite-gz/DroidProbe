@@ -20,4 +20,4 @@ namespace DroidProbe {
     bool get_mounts(std::vector<MountInfo>& mounts);
 }
 
-#endif //DROIDPROBE_MOUNT_INFO_H
+#endif // DROIDPROBE_MOUNT_INFO_H

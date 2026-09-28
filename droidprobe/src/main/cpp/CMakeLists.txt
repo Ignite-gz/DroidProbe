@@ -24,13 +24,15 @@ project("droidprobe")
 # System.loadLibrary() and pass the name of the library defined here;
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
-include_directories(jni system process)
+include_directories(jni system process root common)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        jni/system_properties_jni.cpp jni/process_identity_jni.cpp
+        jni/system_properties_jni.cpp jni/process_identity_jni.cpp jni/kernel_su_detector_jni.cpp
         system/system_properties.cpp
         process/mount_info.cpp process/process_identity.cpp
+        root/kernel_su_detector.cpp
+        common/droid_probe_log.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

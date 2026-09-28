@@ -40,4 +40,4 @@ namespace DroidProbe {
     std::vector<gid_t> get_process_groups();
 }
 
-#endif //DROIDPROBE_PROCESS_IDENTITY_H
+#endif // DROIDPROBE_PROCESS_IDENTITY_H

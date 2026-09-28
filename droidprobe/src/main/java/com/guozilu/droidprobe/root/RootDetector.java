@@ -22,7 +22,8 @@ public class RootDetector extends CompositeDetector {
             new MountDetector(),
             new MagiskDetector(),
             new ProcessIdentityDetector(),
-            new BusyBoxDetector()
+            new BusyBoxDetector(),
+            new KernelSuDetector()
         ));
     }
 
