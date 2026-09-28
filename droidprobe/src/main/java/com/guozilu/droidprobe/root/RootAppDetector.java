@@ -37,6 +37,9 @@ public final class RootAppDetector extends AbstractDetector {
         // KernelSU Next
         "com.rifsxd.ksunext",
 
+        // SuKiSU
+        "org.sukisu.manager",
+
         // SukiSU Ultra
         "com.sukisu.ultra",
 
@@ -51,6 +54,9 @@ public final class RootAppDetector extends AbstractDetector {
 
         // Superuser
         "com.koushikdutta.superuser",
+        "me.phh.superuser",
+        "com.noshufou.android.su",
+        "com.noshufou.android.su.elite",
 
         // KingRoot
         "com.kingroot.kinguser",
