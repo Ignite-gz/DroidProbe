@@ -444,7 +444,6 @@ namespace {
             return;
         }
 
-        // 虽然官方表示 KernelSU 只能运行在 Linux 内核版本 4.14+ 的设备上，但一些其他版本的 KernelSU 是可以在地版本运行的
         AddEvidence(
             result,
             0,
@@ -453,6 +452,31 @@ namespace {
             "当前内核版本仅作为 KernelSU 兼容性分析上下文；不依据版本号单独判定设备是否安装或运行 KernelSU"
         );
     } /* AddKernelVersionContext */
+
+    /**
+    * 查看 Kernel Su 的运行环境要求，发现它必须运行中 Linux 内核版本高于 4.14 的环境中
+    * 这个函数就是检查当前 Linux 内核版本是否 >= 4.14
+    * @return 如果当前 Linux 内核版本大于等于 4.14 返回 true，否则返回 false
+    */
+    bool IsKernelVersionSupportedForKsu() {
+        struct utsname buf{};
+        if (uname(&buf) != 0) {
+            // 如果获取失败，出于防御性编程考量，默认认为可能支持，继续向下执行检测
+            return true;
+        }
+
+        int major = 0;
+        int minor = 0;
+        // buf.release 格式通常为 "4.14.180-gabcdef" 或 "5.10.101-android12-..."
+        if (sscanf(buf.release, "%d.%d", &major, &minor) == 2) {
+            if (major < 4 || (major == 4 && minor < 14)) {
+                // 内核版本 < 4.14，物理上不可能运行 KernelSU
+                return false;
+            }
+        }
+
+        return true;
+    } /* IsKernelVersionSupportedForKsu */
 
     /**
      * @brief 探测 prctl 系统调用的异常响应，作为 KernelSU 相关的实验性辅助检测。
@@ -595,6 +619,11 @@ namespace {
  * @return Native 扫描结果
  */
 DroidProbe::Root::KernelSuScanResult DroidProbe::Root::KernelSuScanner::Scan() {
+    // Linux 内核版本不支持 KernelSU
+    if (!IsKernelVersionSupportedForKsu()) {
+        return {};
+    }
+
     KernelSuScanResult result;
 
     try {

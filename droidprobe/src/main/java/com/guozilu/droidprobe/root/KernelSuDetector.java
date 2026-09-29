@@ -118,6 +118,10 @@ public final class KernelSuDetector extends AbstractDetector {
 
         // 即使 riskScore == 0 也只是扫描完成但未命中当前已配置的 KernelSU 特征。
         // 这只表示“未发现已知特征”，不代表可以排除所有隐藏或修改过的实现。
+        if (riskScore == 0) {
+            return createResult(DetectionStatus.NOT_DETECTED, RiskLevel.NONE, evidences);
+        }
+
         return createResult(DetectionStatus.DETECTED, getRiskLevel(riskScore), evidences);
     }
 
