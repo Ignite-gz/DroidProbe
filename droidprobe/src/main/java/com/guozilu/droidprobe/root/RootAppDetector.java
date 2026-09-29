@@ -45,6 +45,7 @@ public final class RootAppDetector extends AbstractDetector {
 
         // APatch
         "me.bmax.apatch",
+        "me.garfieldhan.apatch.next",
 
         // APatch Next
         "me.garfieldhan.apatch.next",
