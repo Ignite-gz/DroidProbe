@@ -33,11 +33,11 @@ include_directories(jni system process root common)
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         jni/system_properties_jni.cpp jni/process_identity_jni.cpp jni/kernel_su_detector_jni.cpp
-        jni/mount_utils_jni.cpp
+        jni/mount_utils_jni.cpp jni/apatch_scanner_jni.cpp
 
         system/system_properties.cpp
         process/mount_info.cpp process/process_identity.cpp
-        root/kernel_su_detector.cpp
+        root/kernel_su_detector.cpp root/apatch_scanner.cpp
         common/droid_probe_log.cpp
 )
 
