@@ -7,50 +7,10 @@
 
 #include <string>
 #include <vector>
+#include "native_detector_utils.h"
 
 namespace DroidProbe {
     namespace Root {
-
-        /**
-         * Native 层检测证据的数据结构。
-         *
-         * <p>该结构不依赖 JNI，负责在 Native 探针与 JNI 桥接层之间传递结果。
-         * JNI 桥接层会在扫描完成后统一将其转换为 Java DetectionEvidence 对象。</p>
-         */
-        struct KernelSuEvidence {
-            std::string type;
-            std::string value;
-            std::string description;
-        };
-
-        /**
-         * Native 扫描状态。
-         *
-         * <p>将“未发现特征”和“没有能力完成检测”分开，防止把权限不足、文件不可读
-         * 或解析失败错误解释为设备不存在 KernelSU。</p>
-         */
-        enum class KernelSuScanState {
-            /** 扫描流程执行完成，当前可用数据源均已处理。 */
-            COMPLETE,
-
-            /** 至少一个重要数据源不可访问、读取失败或扫描受限。 */
-            INCOMPLETE,
-
-            /** 扫描器内部发生不可恢复错误。 */
-            ERROR
-        };
-
-        /**
-         * KernelSU 扫描汇总结果。
-         *
-         * <p>risk_score 表示当前命中证据中的最高分值，不做无条件累加。
-         * evidences 保存每一项独立证据，供 Java 层展示、归档或进行更高层的融合判断。</p>
-         */
-        struct KernelSuScanResult {
-            int risk_score = 0;
-            KernelSuScanState state = KernelSuScanState::COMPLETE;
-            std::vector<KernelSuEvidence> evidences;
-        };
 
         /**
          * KernelSU Native 探针调度器。
@@ -64,11 +24,27 @@ namespace DroidProbe {
         class KernelSuScanner final {
         public:
             /**
-             * 执行一次完整的 KernelSU 特征扫描。
+             * 执行 KernelSU 多维度特征扫描。
              *
-             * @return 含最高命中分值、扫描状态及证据列表的结果对象
+             * <p>扫描仅采集当前进程能够访问的数据，不执行 su，不修改系统状态，也不尝试
+             * 调用可能改变管理器身份、授予 Root 权限或修改内核配置的 KernelSU 命令。</p>
+             *
+             * <p>探测数据源包括：</p>
+             * <ol>
+             *     <li>uname：记录内核版本，作为兼容性上下文。</li>
+             *     <li>/proc/modules：识别以模块形式加载、且名称精确匹配的候选条目。</li>
+             *     <li>/proc/net/unix：仅匹配明确列出的候选 Socket 名称。</li>
+             *     <li>已知文件路径：只在 stat 成功时记录存在，不对 ENOENT/EACCES 作越权推断。</li>
+             *     <li>/proc/kallsyms：在可读取时解析符号名列，查找 KSU 前缀特征。</li>
+             * </ol>
+             *
+             * <p>风险分值只取最高命中证据，不累加不同来源的弱信号。任何关键数据源不可读、
+             * 读取被截断或解析无法完成时，若没有阳性证据，结果状态为 INCOMPLETE，交由
+             * Java 层映射为 UNKNOWN。</p>
+             *
+             * @return Native 扫描结果
              */
-            static KernelSuScanResult Scan();
+            static DroidProbe::Root::NativeScanResult Scan();
         };
 
     } // namespace Root

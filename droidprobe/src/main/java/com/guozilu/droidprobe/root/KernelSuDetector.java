@@ -1,15 +1,10 @@
 package com.guozilu.droidprobe.root;
 
-import android.content.Context;
-
-import com.guozilu.droidprobe.core.AbstractDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
 import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.DetectionStatus;
 import com.guozilu.droidprobe.core.RiskLevel;
 
-import java.util.ArrayList;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.List;
 
 /**
@@ -39,90 +34,15 @@ import java.util.List;
  * KernelSU 版本、分支、集成方式或设备 ROM 改变。发布前应在已知干净设备及
  * 不同 KernelSU 版本的实机上验证命中率和误报率。</p>
  */
-public final class KernelSuDetector extends AbstractDetector {
+public final class KernelSuDetector extends AbstractNativeRootDetector {
     private static final String TAG = "KernelSuDetector";
 
     static {
         System.loadLibrary("droidprobe");
     }
 
-    /**
-     * Native 扫描失败时的返回码。
-     *
-     * <p>负数为状态码，非负数为最高命中分值。Java 层必须先判断负数，
-     * 再进行风险等级映射。</p>
-     */
-    private static final int NATIVE_SCAN_ERROR = -1;
-    private static final int NATIVE_SCAN_INCOMPLETE = -2;
-
-    /**
-     * 检测分值采用“最高有效证据”映射，而不是把相关探针的分数直接相加。
-     * 这样可以降低同一个系统现象通过多个数据源被重复计分后造成的误判。
-     */
-    private static final int SCORE_CRITICAL = 90;
-    private static final int SCORE_HIGH = 75;
-    private static final int SCORE_MEDIUM_HIGH = 60;
-    private static final int SCORE_MEDIUM = 40;
-
     public KernelSuDetector() {
-        super("kernel_su", DetectionCategory.ROOT);
-    }
-
-    @Override
-    protected DetectionResult doDetect(Context context) {
-        List<DetectionEvidence> evidences = new ArrayList<>();
-
-        // Native 层只负责采集证据和计算最高命中分值，风险等级由 Java 层统一管理。
-        final int riskScore;
-        try {
-            riskScore = nativeScan(evidences);
-        }
-        catch (RuntimeException | LinkageError exception) {
-            // JNI 加载、链接或调用发生异常时，不应让单个检测器影响整个扫描流程。
-            evidences.add(new DetectionEvidence(
-                "NATIVE_SCAN_ERROR",
-                exception.getClass().getName(),
-                "KernelSU Native 探针执行失败，当前检测结果不可用"
-            ));
-            return createResult(
-                DetectionStatus.ERROR,
-                RiskLevel.LOW,
-                evidences
-            );
-        }
-
-        if (riskScore == NATIVE_SCAN_ERROR) {
-            evidences.add(new DetectionEvidence(
-                "NATIVE_SCAN_ERROR",
-                "nativeScan",
-                "Native 层未能完成扫描，无法确认 KernelSU 检测结果"
-            ));
-            return createResult(DetectionStatus.ERROR, RiskLevel.LOW, evidences);
-        }
-
-        if (riskScore == NATIVE_SCAN_INCOMPLETE) {
-            // 关键数据源均不可观测或扫描不完整：没有阳性结果不等于设备干净
-            return createResult(DetectionStatus.UNKNOWN, RiskLevel.LOW, evidences);
-        }
-
-        if (riskScore < 0) {
-            // 对未约定的负数返回码采取保守处理，避免意外映射成高风险
-            evidences.add(new DetectionEvidence(
-                "NATIVE_SCAN_UNKNOWN_STATUS",
-                String.valueOf(riskScore),
-                "Native 层返回了未知状态码，当前检测结果不可确定"
-            ));
-            return createResult(DetectionStatus.UNKNOWN, RiskLevel.LOW, evidences);
-        }
-
-
-        // 即使 riskScore == 0 也只是扫描完成但未命中当前已配置的 KernelSU 特征。
-        // 这只表示“未发现已知特征”，不代表可以排除所有隐藏或修改过的实现。
-        if (riskScore == 0) {
-            return createResult(DetectionStatus.NOT_DETECTED, RiskLevel.NONE, evidences);
-        }
-
-        return createResult(DetectionStatus.DETECTED, getRiskLevel(riskScore), evidences);
+        super("kernel_su", "KernelSU");
     }
 
     /**
@@ -131,17 +51,18 @@ public final class KernelSuDetector extends AbstractDetector {
      * @param riskScore Native 层返回的最高证据分值
      * @return 与分值对应的风险等级
      */
-    private static RiskLevel getRiskLevel(int riskScore) {
-        if (riskScore >= SCORE_CRITICAL) {
+    @Override
+    protected RiskLevel getRiskLevel(int riskScore) {
+        if (riskScore >= 90) {
             return RiskLevel.CRITICAL;
         }
-        else if (riskScore >= SCORE_HIGH) {
+        else if (riskScore >= 75) {
             return RiskLevel.HIGH;
         }
-        else if (riskScore >= SCORE_MEDIUM_HIGH) {
+        else if (riskScore >= 60) {
             return RiskLevel.MEDIUM_HIGH;
         }
-        else if (riskScore >= SCORE_MEDIUM) {
+        else if (riskScore >= 40) {
             return RiskLevel.MEDIUM;
         }
         else if (riskScore > 0) {
@@ -153,14 +74,6 @@ public final class KernelSuDetector extends AbstractDetector {
         else {
             return RiskLevel.UNKNOWN;
         }
-    }
-
-    /**
-     * 统一创建检测结果，避免在各个分支中重复填写检测器 ID 和分类。
-     */
-    private DetectionResult createResult(DetectionStatus status, RiskLevel riskLevel,
-        List<DetectionEvidence> evidences) {
-        return new DetectionResult(getId(), getCategory(), status, riskLevel, evidences);
     }
 
     /**
@@ -180,5 +93,6 @@ public final class KernelSuDetector extends AbstractDetector {
      * @param evidences 用于接收 Native 层检测证据的 Java List
      * @return 最高命中分值或上述状态码
      */
-    private native int nativeScan(List<DetectionEvidence> evidences);
+    @Override
+    protected native int nativeScan(@NotNull List<DetectionEvidence> evidences);
 }

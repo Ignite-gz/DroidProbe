@@ -55,134 +55,13 @@ namespace {
     constexpr int kScoreKsuPath = 60;
     constexpr int kScoreCandidateSocket = 50;
 
-    /** procfs 文件读取上限，避免异常环境下无界读取。 */
-    constexpr size_t kMaxProcFileBytes = 16U * 1024U * 1024U;
-    constexpr size_t kMaxEvidencePerSource = 8U;
-    constexpr size_t kReadBufferSize = 4096U;
-
-    /**
-     * 有界文件读取状态。
-     *
-     * <p>procfs 是动态伪文件系统，普通文件的 seek/size 语义不一定适用，因而使用
-     * read() 顺序读取，并显式区分读取失败与读取被上限截断。</p>
-     */
-    struct ReadResult {
-        bool opened = false;
-        bool completed = false;
-        bool truncated = false;
-        int error_number = 0;
-        std::string content;
-    };
-
-    /**
-     * 使用 POSIX open/read 有界读取文件。
-     *
-     * @param path 待读取路径
-     * @param max_bytes 最大读取字节数
-     * @return 包含读取状态、errno 和文本内容的结果
-     */
-    ReadResult ReadTextFile(const char* path, size_t max_bytes) {
-        ReadResult result;
-        if (path == nullptr || max_bytes == 0U) {
-            result.error_number = EINVAL;
-            return result;
-        }
-
-        const int fd = open(path, O_RDONLY | O_CLOEXEC);
-        if (fd < 0) {
-            result.error_number = errno;
-            return result;
-        }
-        result.opened = true;
-
-        char buffer[kReadBufferSize];
-        while (result.content.size() < max_bytes) {
-            const size_t remaining = max_bytes - result.content.size();
-            const size_t bytes_to_read = std::min(remaining, sizeof(buffer));
-            const ssize_t count = read(fd, buffer, bytes_to_read);
-
-            if (count == 0) {
-                result.completed = true;
-                break;
-            }
-            if (count < 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-                result.error_number = errno;
-                break;
-            }
-
-            result.content.append(buffer, static_cast<size_t>(count));
-        } /* while */
-
-        if (result.opened && !result.completed && result.error_number == 0
-            && result.content.size() >= max_bytes) {
-            // 达到读取上限时，不继续消耗资源；调用方应将该数据源标记为不完整。
-            result.truncated = true;
-        }
-
-        close(fd);
-        return result;
-    } /* ReadTextFile */
-
-    /**
-     * 将检测证据追加到结果中，并更新最高命中分值。
-     *
-     * <p>同一类型和值的证据只保留一次；多项证据不累加，而是取最高分，避免相关
-     * 信号被重复计算后夸大风险等级。</p>
-     */
-    void AddEvidence(DroidProbe::Root::KernelSuScanResult& result, int score, const char* type,
-                     const std::string& value, const char* description) {
-        if (type == nullptr || description == nullptr) {
-            return;
-        }
-
-        for (const auto& existing : result.evidences) {
-            // 发现重复条目
-            if (existing.type == type && existing.value == value) {
-                result.risk_score = std::max(result.risk_score, score);
-                return;
-            }
-        }
-
-        result.evidences.push_back(std::move(DroidProbe::Root::KernelSuEvidence{type, value, description}));
-        result.risk_score = std::max(result.risk_score, score);
-    } /* AddEvidence */
-
-    /**
-     * 将数据源不可观测或读取不完整的情况作为诊断证据记录。
-     *
-     * <p>可访问性问题本身不是 KernelSU 证据，因此 score 固定为 0；它只会影响
-     * 最终扫描状态，使“未发现”与“无法确认”能够被区分。</p>
-     */
-    void AddScanLimitation(DroidProbe::Root::KernelSuScanResult& result, const char* source,
-                           const char* reason) {
-        result.state = DroidProbe::Root::KernelSuScanState::INCOMPLETE;
-        AddEvidence(
-            result,
-            0,
-            "SCAN_LIMITATION",
-            source == nullptr ? "unknown" : source,
-            reason == nullptr ? "检测数据源不可用" : reason
-        );
-    } /* AddScanLimitation */
-
-    /**
-     * 判断 errno 是否表示路径不可访问。
-     * EACCES/EPERM 代表当前调用者缺少访问权限，不代表目标不存在或系统已被篡改。
-     */
-    bool IsPermissionError(int error_number) {
-        return error_number == EACCES || error_number == EPERM;
-    } /* IsPermissionError */
-
     /**
      * 检查已知 KernelSU 文件系统路径。
      *
      * <p>仅当 stat() 成功时报告“路径存在”。ENOENT 只表示路径当前不可解析，
      * 不作风险加分；EACCES/EPERM 表示无法判断路径是否存在，扫描状态记为不完整。</p>
      */
-    void CheckKsuPaths(DroidProbe::Root::KernelSuScanResult& result) {
+    void CheckKsuPaths(DroidProbe::Root::NativeScanResult& result) {
         for (const char* path : kKsuPaths) {
             struct stat file_status{};
             errno = 0;
@@ -200,7 +79,7 @@ namespace {
             }
 
             const int error_number = errno;
-            if (IsPermissionError(error_number)) {
+            if (DroidProbe::Root::IsPermissionError(error_number)) {
                 AddScanLimitation(
                     result,
                     path,
@@ -224,7 +103,8 @@ namespace {
      * <p>/proc/modules 只列出作为可加载模块呈现的模块。KernelSU 若以内核源码
      * 内建方式编译，可能不会出现在这里；因此无命中不是排除结论。</p>
      */
-    void CheckProcModules(DroidProbe::Root::KernelSuScanResult& result) {
+    void CheckProcModules(DroidProbe::Root::NativeScanResult& result) {
+        using namespace DroidProbe::Root;
         const ReadResult read_result = ReadTextFile("/proc/modules", kMaxProcFileBytes);
         if (!read_result.opened) {
             AddScanLimitation(
@@ -298,7 +178,8 @@ namespace {
      * <p>成功读取文件不是 SELinux 绕过或 KernelSU 的证据。只有实际命中候选名称
      * 才记录低至中等强度的 KernelSU 线索；候选名称本身不是 KernelSU 的稳定 ABI。</p>
      */
-    void CheckAbstractSockets(DroidProbe::Root::KernelSuScanResult& result) {
+    void CheckAbstractSockets(DroidProbe::Root::NativeScanResult& result) {
+        using namespace DroidProbe::Root;
         const ReadResult read_result = ReadTextFile("/proc/net/unix", kMaxProcFileBytes);
         if (!read_result.opened) {
             AddScanLimitation(
@@ -371,7 +252,8 @@ namespace {
      * <p>符号命中是比通用系统属性更具体的线索，但仍可能受源码版本、符号隐藏、
      * 编译方式和厂商改动影响；它不是防篡改证明。</p>
      */
-    void CheckKallsyms(DroidProbe::Root::KernelSuScanResult& result) {
+    void CheckKallsyms(DroidProbe::Root::NativeScanResult& result) {
+        using namespace DroidProbe::Root;
         const ReadResult read_result = ReadTextFile("/proc/kallsyms", kMaxProcFileBytes);
         if (!read_result.opened) {
             AddScanLimitation(
@@ -433,7 +315,7 @@ namespace {
      * 手动回移植或第三方分支。因此这里不以版本号硬性跳过探测，也不把版本号本身
      * 作为 Root 阳性证据。</p>
      */
-    void AddKernelVersionContext(DroidProbe::Root::KernelSuScanResult& result) {
+    void AddKernelVersionContext(DroidProbe::Root::NativeScanResult& result) {
         struct utsname info {};
         if (uname(&info) != 0) {
             AddScanLimitation(
@@ -496,7 +378,7 @@ namespace {
      *
      * @param result KernelSU 扫描结果，检测证据直接追加到该对象
      */
-    void CheckSyscallAnomaly(DroidProbe::Root::KernelSuScanResult& result) {
+    void CheckSyscallAnomaly(DroidProbe::Root::NativeScanResult& result) {
         /**
          * 历史 KernelSU prctl 接口候选值。
          *
@@ -598,33 +480,17 @@ namespace {
 
 
 /**
- * 执行 KernelSU 多维度特征扫描。
+ * 执行一次完整的 KernelSU 特征扫描。
  *
- * <p>扫描仅采集当前进程能够访问的数据，不执行 su，不修改系统状态，也不尝试
- * 调用可能改变管理器身份、授予 Root 权限或修改内核配置的 KernelSU 命令。</p>
- *
- * <p>探测数据源包括：</p>
- * <ol>
- *     <li>uname：记录内核版本，作为兼容性上下文。</li>
- *     <li>/proc/modules：识别以模块形式加载、且名称精确匹配的候选条目。</li>
- *     <li>/proc/net/unix：仅匹配明确列出的候选 Socket 名称。</li>
- *     <li>已知文件路径：只在 stat 成功时记录存在，不对 ENOENT/EACCES 作越权推断。</li>
- *     <li>/proc/kallsyms：在可读取时解析符号名列，查找 KSU 前缀特征。</li>
- * </ol>
- *
- * <p>风险分值只取最高命中证据，不累加不同来源的弱信号。任何关键数据源不可读、
- * 读取被截断或解析无法完成时，若没有阳性证据，结果状态为 INCOMPLETE，交由
- * Java 层映射为 UNKNOWN。</p>
- *
- * @return Native 扫描结果
+ * @return 含最高命中分值、扫描状态及证据列表的结果对象
  */
-DroidProbe::Root::KernelSuScanResult DroidProbe::Root::KernelSuScanner::Scan() {
+DroidProbe::Root::NativeScanResult DroidProbe::Root::KernelSuScanner::Scan() {
     // Linux 内核版本不支持 KernelSU
     if (!IsKernelVersionSupportedForKsu()) {
         return {};
     }
 
-    KernelSuScanResult result;
+    NativeScanResult result;
 
     try {
         AddKernelVersionContext(result);
@@ -635,7 +501,7 @@ DroidProbe::Root::KernelSuScanResult DroidProbe::Root::KernelSuScanner::Scan() {
         CheckSyscallAnomaly(result);
     }
     catch (...) {
-        result.state = KernelSuScanState::ERROR;
+        result.state = NativeScanState::ERROR;
         AddEvidence(
             result,
             0,

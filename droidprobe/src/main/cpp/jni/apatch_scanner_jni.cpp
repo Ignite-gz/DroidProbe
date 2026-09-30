@@ -5,6 +5,7 @@
 #include <jni.h>
 #include <vector>
 #include "apatch_scanner.h"
+#include "droid_probe_log.h"
 
 namespace {
 
@@ -88,136 +89,42 @@ namespace {
 } // namespace
 
 extern "C"
-JNIEXPORT jobject JNICALL
-Java_com_guozilu_droidprobe_root_APatchDetector_nativeScanAPatch(JNIEnv *env, jobject thiz,
-                                                                 jint android_api_level) {
-    // TODO: implement nativeScanAPatch()
+JNIEXPORT jint JNICALL
+Java_com_guozilu_droidprobe_root_APatchDetector_nativeScan(JNIEnv *env, jobject thiz,
+    jobject evidences) {
+    // TODO: implement nativeScan()
+    using namespace DroidProbe::Root;
+    if (evidences == nullptr) {
+        DroidProbe::Log::error(__FUNCTION__, "%s", "List<DetectionEvidence> evidences is null!");
+        return 0;
+    }
+
     try {
-        // 执行纯 C++ 的 APatch 检测逻辑。
-        const DroidProbe::Root::APatchScanResult result =
-            DroidProbe::Root::APatchScanner::Scan(
-                static_cast<int>(android_api_level)
-            );
+        NativeScanResult result = APatchScanner::Scan();
 
-        // 找到 Java String 类，用于创建三个 String[] 证据数组。
-        jclass string_class = env->FindClass(kStringClass);
-
-        if (string_class == nullptr || env->ExceptionCheck()) {
-            // FindClass 失败时清理异常，避免异常跨 JNI 边界继续传播。
-            if (env->ExceptionCheck()) {
-                env->ExceptionClear();
-            }
-
-            return nullptr;
+        if (!AppendJavaEvidences(env, evidences, result.evidences)) {
+            // 若 Java 异常仍处于 pending 状态，则保留异常，由 JNI 返回路径传回 Java
+            return kNativeScanError;
         }
 
-        // 将 C++ evidence 转换成 Java 能理解的三个平行数组。
-        std::vector<std::string> rule_names;
-        std::vector<std::string> targets;
-        std::vector<std::string> details;
-
-        // 预分配容量，减少 vector 扩容次数。
-        rule_names.reserve(result.evidences.size());
-        targets.reserve(result.evidences.size());
-        details.reserve(result.evidences.size());
-
-        // 提取每条 Native evidence 的三个字符串字段。
-        for (const auto& evidence : result.evidences) {
-            rule_names.push_back(evidence.rule);
-            targets.push_back(evidence.target);
-            details.push_back(evidence.detail);
+        // 有阳性证据时优先返回分值，即使扫描器随后遇到局部错误。
+        // 扫描完整性由证据说明；Java 层对阳性分值正常映射风险等级。
+        if (result.risk_score > 0) {
+            return static_cast<jint>(result.risk_score);
         }
 
-        // 创建 ruleName[]。
-        jobjectArray rule_array =
-            NewStringArray(env, string_class, rule_names);
-
-        // 创建 target[]。
-        jobjectArray target_array =
-            NewStringArray(env, string_class, targets);
-
-        // 创建 detail[]。
-        jobjectArray detail_array =
-            NewStringArray(env, string_class, details);
-
-        // string_class 已经完成使命，可以删除局部引用。
-        env->DeleteLocalRef(string_class);
-
-        // 任意数组创建失败都不能继续实例化 Java Result。
-        if (rule_array == nullptr || target_array == nullptr || detail_array == nullptr) {
-            if (rule_array != nullptr) {
-                env->DeleteLocalRef(rule_array);
-            }
-            if (target_array != nullptr) {
-                env->DeleteLocalRef(target_array);
-            }
-            if (detail_array != nullptr) {
-                env->DeleteLocalRef(detail_array);
-            }
-
-            return nullptr;
+        if (result.state == NativeScanState::ERROR) {
+            return kNativeScanError;
         }
 
-        // 查找 Java 内部类 APatchDetector$APatchNativeResult。
-        jclass result_class = env->FindClass(kNativeResultClass);
-
-        if (result_class == nullptr || env->ExceptionCheck()) {
-            if (env->ExceptionCheck()) {
-                env->ExceptionClear();
-            }
-
-            env->DeleteLocalRef(rule_array);
-            env->DeleteLocalRef(target_array);
-            env->DeleteLocalRef(detail_array);
-            return nullptr;
+        if (result.state == NativeScanState::INCOMPLETE) {
+            return kNativeScanIncomplete;
         }
 
-        // 获取五参数构造函数：score、state、三个 String[]。
-        jmethodID constructor = env->GetMethodID(
-            result_class,
-            "<init>",
-            kNativeResultConstructor
-        );
-
-        if (constructor == nullptr || env->ExceptionCheck()) {
-            if (env->ExceptionCheck()) {
-                env->ExceptionClear();
-            }
-
-            env->DeleteLocalRef(result_class);
-            env->DeleteLocalRef(rule_array);
-            env->DeleteLocalRef(target_array);
-            env->DeleteLocalRef(detail_array);
-            return nullptr;
-        }
-
-        // 创建 Java APatchNativeResult 对象。
-        jobject java_result = env->NewObject(
-            result_class,
-            constructor,
-            static_cast<jint>(result.max_score),
-            static_cast<jint>(result.state),
-            rule_array,
-            target_array,
-            detail_array
-        );
-
-        // 所有 JNI 局部引用在返回前释放，避免长期扫描造成 Local Reference 累积。
-        env->DeleteLocalRef(result_class);
-        env->DeleteLocalRef(rule_array);
-        env->DeleteLocalRef(target_array);
-        env->DeleteLocalRef(detail_array);
-
-        // NewObject 可能抛出 Java 异常；这种情况下返回 null，由 Java 层转为 UNKNOWN。
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-            return nullptr;
-        }
-
-        return java_result;
-    } catch (...) {
-        // 最后一道边界：任何 C++ 异常都不能跨越 JNI 边界。
-        // 这里不主动向 Java 抛自定义异常，而是返回 null，让检测器进入 UNKNOWN。
-        return nullptr;
+        return 0;
+    }
+    catch (...) {
+        // 不允许 C++ 异常跨越 JNI 边界。
+        return kNativeScanError;
     }
 }

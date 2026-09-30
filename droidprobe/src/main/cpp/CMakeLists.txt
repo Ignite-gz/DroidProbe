@@ -36,8 +36,11 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         jni/mount_utils_jni.cpp jni/apatch_scanner_jni.cpp
 
         system/system_properties.cpp
+
         process/mount_info.cpp process/process_identity.cpp
-        root/kernel_su_detector.cpp root/apatch_scanner.cpp
+
+        root/kernel_su_detector.cpp root/apatch_scanner.cpp root/native_detector_utils.cpp
+
         common/droid_probe_log.cpp
 )
 

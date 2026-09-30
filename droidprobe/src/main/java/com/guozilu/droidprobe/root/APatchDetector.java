@@ -11,6 +11,8 @@ import com.guozilu.droidprobe.core.DetectionResult;
 import com.guozilu.droidprobe.core.DetectionStatus;
 import com.guozilu.droidprobe.core.RiskLevel;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,193 +43,60 @@ import java.util.List;
  *
  * <p>实际情况：根据我的实际测试，在比较最新版本的 APatch 的 root 方案中，是根本检测不出来的，
  * 因为这毕竟是内核层面的 root 方案，目前只能检测一些老版本安卓 + 老版本 APatch，那如果想检测
- * 新版本的话，目前我还是无从下手的，也许以后就可以检测了</p>
+ * 新版本的话，目前我还是无从下手的，也许以后会深度研究实现这个检测</p>
  */
-public final class APatchDetector extends AbstractDetector {
+public final class APatchDetector extends AbstractNativeRootDetector {
     private static final String TAG = "APatchDetector";
 
     static {
+        // 加载 DroidProbe 的 Native 库，后续 nativeScanAPatch() 会由 JNI 层实现。
         System.loadLibrary("droidprobe");
     }
 
     public APatchDetector() {
-        super("apatch", DetectionCategory.ROOT);
+        // APatch 本质上属于 Root / kernel-root 环境，因此归入 ROOT 分类。
+        super("apatch", "APatch");
     }
 
     @Override
-    protected DetectionResult doDetect(Context context) {
-        // 创建统一的证据列表；Java 层和 Native 层最终都把检测结果合并到这里。
-        List<DetectionEvidence> evidences = new ArrayList<>();
-
-        // 把当前 Android API Level 传给 Native，而不是让 Native 依赖 NDK API 的 Android 版本查询接口。
-        // 这样可以保持 minSdk 23 的兼容性，并且让 Native 只负责 Linux / procfs / kernel 检测。
-        APatchNativeResult nativeResult = nativeScanAPatch(Build.VERSION.SDK_INT);
-
-        // 将 Native 返回的结构化证据逐项追加到统一结果列表。
-        if (nativeResult != null) {
-            nativeResult.appendEvidenceTo(evidences);
+    protected RiskLevel getRiskLevel(int riskScore) {
+        if (riskScore >= 85) {
+            return RiskLevel.CRITICAL;
         }
-
-        // Java 层和 Native 层都没有任何检测分数时，仍然要考虑“扫描是否完整”。
-        if (nativeResult == null) {
-            evidences.add(new DetectionEvidence(
-                "NATIVE_SCAN_UNAVAILABLE",
-                "droidprobe",
-                "APatch Native 检测器没有返回结果，无法确认当前环境"
-            ));
-
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.UNKNOWN,
-                RiskLevel.LOW,
-                evidences
-            );
+        else if (riskScore >= 65) {
+            return RiskLevel.MEDIUM_HIGH;
         }
-
-        int score = nativeResult.maxScore;
-
-        // Native 扫描发现一个已经由源码验证的 KernelPatch/APatch 内核强证据时，
-        // 其分值会高于管理器包名等弱证据。
-        if (score >= 85) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.DETECTED,
-                RiskLevel.CRITICAL,
-                evidences
-            );
+        else if (riskScore >= 40) {
+            return RiskLevel.MEDIUM;
         }
-
-        if (score >= 65) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.DETECTED,
-                RiskLevel.MEDIUM_HIGH,
-                evidences
-            );
+        else if (riskScore > 0) {
+            return RiskLevel.LOW;
         }
-
-        if (score >= 40) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.DETECTED,
-                RiskLevel.MEDIUM,
-                evidences
-            );
+        else if (riskScore == 0) {
+            return RiskLevel.NONE;
         }
-
-        if (score > 0) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.UNKNOWN,
-                RiskLevel.LOW,
-                evidences
-            );
-        }
-
-        // Native 将 unsupported kernel / 不可观测状态等情况编码到 scanState 中。
-        // 如果扫描能力不完整，不能把“没看到”直接解释成“没有 APatch”。
-        if (nativeResult.scanState == NativeScanState.UNKNOWN
-            || nativeResult.scanState == NativeScanState.UNSUPPORTED) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
-                DetectionStatus.UNKNOWN,
-                RiskLevel.LOW,
-                evidences
-            );
-        }
-
-        // 所有可观察探针都完成并且没有发现阳性特征时，才返回 NOT_DETECTED。
-        return new DetectionResult(
-            getId(),
-            getCategory(),
-            DetectionStatus.NOT_DETECTED,
-            RiskLevel.NONE,
-            evidences
-        );
-    }
-
-    /**
-     * Native 层返回的扫描状态。
-     */
-    private static final class NativeScanState {
-        /** 所有可观察探针完成，并且没有检测到 APatch 特征。 */
-        static final int CLEAN = 0;
-        /** 至少发现一项 APatch / KernelPatch 相关证据。 */
-        static final int DETECTED = 1;
-        /** 系统信息或关键 procfs 数据不可观察，不能排除 APatch。 */
-        static final int UNKNOWN = 2;
-        /** 当前内核不在 APatch 官方声明的验证范围内。 */
-        static final int UNSUPPORTED = 3;
-        /** Native 扫描自身发生错误。 */
-        static final int ERROR = 4;
-
-        private NativeScanState() {
+        else {
+            return RiskLevel.UNKNOWN;
         }
     }
 
     /**
-     * Native 检测结果的 Java 镜像。
+     * JNI 扫描入口。
      *
-     * <p>为了避免 C++ JNI 层频繁操作 java.util.List，Native 一次性返回结构化数组，
-     * 然后 Java 再创建 DetectionEvidence。这种方式也更容易维护和单元测试。</p>
-     */
-    private static final class APatchNativeResult {
-        /** Native 扫描最高证据分值。 */
-        final int maxScore;
-        /** Native 扫描状态。 */
-        final int scanState;
-        /** Native 返回的规则名。 */
-        final String[] ruleNames;
-        /** Native 返回的目标值。 */
-        final String[] targets;
-        /** Native 返回的详细描述。 */
-        final String[] details;
-
-        APatchNativeResult(
-            int maxScore,
-            int scanState,
-            String[] ruleNames,
-            String[] targets,
-            String[] details) {
-            this.maxScore = maxScore;
-            this.scanState = scanState;
-            this.ruleNames = ruleNames;
-            this.targets = targets;
-            this.details = details;
-        }
-
-        /**
-         * 把 Native 字符串数组转换成 DroidProbe 的 DetectionEvidence。
-         */
-        void appendEvidenceTo(List<DetectionEvidence> evidences) {
-            // 防御性检查，避免错误的 Native 返回值造成数组越界。
-            if (ruleNames == null || targets == null || details == null) {
-                return;
-            }
-
-            int size = Math.min(ruleNames.length, Math.min(targets.length, details.length));
-
-            for (int i = 0; i < size; i++) {
-                evidences.add(new DetectionEvidence(
-                    ruleNames[i],
-                    targets[i],
-                    details[i]
-                ));
-            }
-        }
-    }
-
-    /**
-     * JNI 入口。
+     * <p>Native 层向 evidences 追加 DetectionEvidence 对象，并返回最高命中分值。</p>
+     * <ul>
+     *     <li>0：扫描完成，未命中已配置特征。</li>
+     *     <li>正数：命中至少一项特征，数值为最高证据分值。</li>
+     *     <li>-1：Native 扫描发生错误。</li>
+     *     <li>-2：扫描不完整或关键数据源不可观测。</li>
+     * </ul>
      *
-     * @param androidApiLevel 当前设备 Android API Level，例如 Android 6.0 为 23。
-     * @return 结构化 Native 扫描结果；JNI 异常时可以返回 null。
+     * <p>即使返回 0，也只能说明未发现当前已知特征；对于隐藏、改名、修改过内核
+     * 接口或当前没有活动守护进程的实现，仍可能无法识别。</p>
+     *
+     * @param evidences 用于接收 Native 层检测证据的 Java List
+     * @return 最高命中分值或上述状态码
      */
-    private native APatchNativeResult nativeScanAPatch(int androidApiLevel);
+    @Override
+    protected native int nativeScan(@NotNull List<DetectionEvidence> evidences);
 }
