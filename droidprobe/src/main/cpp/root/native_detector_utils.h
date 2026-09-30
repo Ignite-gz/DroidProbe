@@ -2,8 +2,8 @@
 // Created by ignite on 9/30/26.
 //
 
-#ifndef DROIDPROBE_NATIVE_DETECTOR_UTILS_
-#define DROIDPROBE_NATIVE_DETECTOR_UTILS_
+#ifndef DROIDPROBE_NATIVE_DETECTOR_UTILS_H
+#define DROIDPROBE_NATIVE_DETECTOR_UTILS_H
 
 #include <jni.h>
 #include <vector>
@@ -205,7 +205,34 @@ namespace DroidProbe {
         * @return 获取成功返回 true，否则返回 false
         */
         bool ReadProcessName(int pid, std::string& name);
+
+
+        /**
+        * @brief 创建 Java String
+        * @param env JNIEnv
+        * @param value 要转化的字符串
+        * @return 如果 env 为 nullptr 则返回 nullptr，否则返回对应的 jstring
+        */
+        jstring NewJavaString(JNIEnv* env, const std::string& value);
+
+        /**
+        * @brief 创建 Java String
+        * @param env JNIEnv
+        * @param value 要转化的字符串
+        * @return 如果 env 为 nullptr 则返回 nullptr，否则返回对应的 jstring
+        */
+        jstring NewJavaString(JNIEnv* env, const char* value);
+
+         /**
+         * @brief 将 C++ vector<string> 转换成 Java String[]。
+         * @param env JNIEnv
+         * @param string_class Java String 类
+         * @param values C++ vector<string>
+         * @return 如果出错了返回 nullptr，否则返回 values 对应的 Java String[]
+         */
+        jobjectArray NewStringArray(JNIEnv* env, jclass string_class, const std::vector<std::string>& values);
+
     }
 }
 
-#endif // DROIDPROBE_NATIVE_DETECTOR_UTILS_
+#endif // DROIDPROBE_NATIVE_DETECTOR_UTILS_H

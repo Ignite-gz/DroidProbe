@@ -87,25 +87,6 @@ public final class MountDetector extends AbstractDetector {
                     "关键系统目录使用 overlay 文件系统"
                 ));
             }
-
-            // 检查 mount source 是否异常
-            if ("magisk".equalsIgnoreCase(mountInfo.getMountSource())) {
-                evidences.add(new DetectionEvidence(
-                    "MOUNT_SOURCE",
-                    mountInfo.getMountSource(),
-                    "关键系统目录的挂载源为 magisk"
-                ));
-            }
-
-            // 检查 mount point 是否异常
-            String lowerCaseMountPoint = mountInfo.getMountPoint().toLowerCase();
-            if (lowerCaseMountPoint.contains("magisk") || lowerCaseMountPoint.contains("/adb/modules/")) {
-                evidences.add(new DetectionEvidence(
-                    "MOUNT_POINT",
-                    mountInfo.getMountPoint(),
-                    "关键系统目录的挂载目标路径为 magisk 或者 magisk 模块"
-                ));
-            }
         }
         if (!evidences.isEmpty()) {
             return new DetectionResult(

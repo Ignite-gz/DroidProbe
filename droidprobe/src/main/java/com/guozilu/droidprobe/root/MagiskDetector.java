@@ -3,6 +3,11 @@ package com.guozilu.droidprobe.root;
 import android.util.Log;
 
 import com.guozilu.droidprobe.core.DetectionEvidence;
+import com.guozilu.droidprobe.core.DetectionResult;
+import com.guozilu.droidprobe.core.DetectionStatus;
+import com.guozilu.droidprobe.core.RiskLevel;
+import com.guozilu.droidprobe.utils.MountInfo;
+import com.guozilu.droidprobe.utils.MountUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -79,5 +84,40 @@ public final class MagiskDetector extends AbstractRootBinaryDetector {
             Log.e(TAG, "An exception threw in MagiskDetector.executeBinary()", e);
             return null;
         }
+    }
+
+    @Override
+    protected List<DetectionEvidence> detectOthers() {
+        // 检查 mount source 是否异常
+        List<DetectionEvidence> evidences = new ArrayList<>();
+        List<MountInfo> mountInfos = MountUtils.getMounts();
+        if (mountInfos == null) {
+            evidences.add(new DetectionEvidence(
+                "MOUNT_INFO",
+                "/proc/self/mountinfo;/proc/self/mounts;mount",
+                "无法获取当前进程的挂载信息"
+            ));
+            return evidences;
+        }
+        for (MountInfo mountInfo : mountInfos) {
+            if ("magisk".equalsIgnoreCase(mountInfo.getMountSource())) {
+                evidences.add(new DetectionEvidence(
+                    "MOUNT_SOURCE",
+                    mountInfo.getMountSource(),
+                    "关键系统目录的挂载源为 magisk"
+                ));
+            }
+
+            // 检查 mount point 是否异常
+            String lowerCaseMountPoint = mountInfo.getMountPoint().toLowerCase();
+            if (lowerCaseMountPoint.contains("magisk") || lowerCaseMountPoint.contains("/adb/modules/")) {
+                evidences.add(new DetectionEvidence(
+                    "MOUNT_POINT",
+                    mountInfo.getMountPoint(),
+                    "关键系统目录的挂载目标路径为 magisk 或者 magisk 模块"
+                ));
+            }
+        }
+        return evidences;
     }
 }

@@ -91,7 +91,7 @@ Java_com_guozilu_droidprobe_utils_MountUtils_getMountsNative(JNIEnv *env, jclass
 
         // 释放 JNI MountInfo 对象的局部引用
         env->DeleteLocalRef(object);
-    }
+    } /* for */
 
     return result;
 }

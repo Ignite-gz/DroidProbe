@@ -83,6 +83,9 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
             evidences.addAll(detectBinaryExecutionEvidences(file));
         }
 
+        //
+        evidences.addAll(detectOthers());
+
         if (evidences.isEmpty()) {
             return new DetectionResult(
                 getId(),
@@ -101,6 +104,10 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
         );
     }
 
+    /**
+     * 获取这些提前定义路径加上环境变量的全部路径
+     * @return 返回这些路径
+     */
     private static List<String> getAllPaths() {
         List<String> paths = new ArrayList<>(Arrays.asList(KNOWN_COMMON_PATHS));
         // Log.i(TAG, Objects.requireNonNull(System.getenv("PATH")));
@@ -165,7 +172,7 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
      * 这个方法在这里是一个 stub
      * 如果想去获取一下这个二进制文件执行的证据，那么需要 override 这个方法，否则不需要做任何操作
      * 约定是，rootBinaryFile 是一个 与 root 有关的二进制文件的 File 的句柄，打开了这个要执行的二进制文件
-     * 如果能执行，那么返回相应的 List<DetectionEvidence>，如果不能执行返回空序列
+     * 如果能执行，那么返回相应的 List&ltDetectionEvidence&gt，如果不能执行返回空序列
      * @param rootBinaryFile 要查看执行情况的二进制文件的句柄
      * @return 如果能执行则返回文件执行时的证据列表，否则返回空列表
      */
@@ -180,5 +187,15 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
      */
     protected String executeBinary() {
         return null;
+    }
+
+    /**
+     * 这个方法在这里是一个 stub
+     * 继承这个抽象类的类，可能需要这个抽象类预定好的功能外的其他功能
+     * 但需求不同，不可能涵盖所有，所以这个方法用于给派生类实现其他查找功能
+     * @return 查找时所产生的证据(List&ltDetectionEvidence&gt)
+     */
+    protected List<DetectionEvidence> detectOthers() {
+        return Collections.emptyList();
     }
 }

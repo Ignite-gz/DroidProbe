@@ -185,7 +185,7 @@ DroidProbe::Root::ReadResult DroidProbe::Root::ReadTextFile(const char* path, si
 
 bool DroidProbe::Root::ReadTextFile(const char* path, std::string& out, size_t max_bytes) {
     return ReadTextFile(path, max_bytes).completed;
-}
+} /* ReadTextFile */
 
 void DroidProbe::Root::AddEvidence(NativeScanResult& result, int score,
     const char* type, const std::string& value, const char* description) {
@@ -236,7 +236,7 @@ bool DroidProbe::Root::ParseKernelRelease(const char* release, int& major, int& 
 
     // 拒绝异常负版本，避免后续比较产生无意义结果。
     return major >= 0 && minor >= 0;
-}
+} /* ParseKernelRelease */
 
 int DroidProbe::Root::CompareKernelVersion(int major, int minor, int other_major, int other_minor) {
     if (major != other_major) {
@@ -248,7 +248,7 @@ int DroidProbe::Root::CompareKernelVersion(int major, int minor, int other_major
     }
 
     return 0;
-}
+} /* CompareKernelVersion */
 
 int DroidProbe::Root::CheckPathExists(const char* path) {
     // 无路径参数时无法判断。
@@ -268,7 +268,7 @@ int DroidProbe::Root::CheckPathExists(const char* path) {
 
     // 其他错误统一归类为不可确定，例如 EACCES / EPERM / EIO。
     return PathAccessResult::PathNotAccessible;
-}
+} /* CheckPathExists */
 
 bool DroidProbe::Root::IsNumeric(const char* text) {
     // 空字符串不是合法数字。
@@ -283,7 +283,7 @@ bool DroidProbe::Root::IsNumeric(const char* text) {
     }
 
     return true;
-}
+} /* IsNumeric */
 
 std::string DroidProbe::Root::Trim(const std::string& value) {
     size_t begin = 0;
@@ -298,7 +298,7 @@ std::string DroidProbe::Root::Trim(const std::string& value) {
     }
 
     return value.substr(begin, end - begin);
-}
+} /* Trim */
 
 bool DroidProbe::Root::ReadProcessName(int pid, std::string& name) {
     // 优先读取 /proc/<pid>/comm，因为它只有极小的固定长度。
@@ -325,4 +325,56 @@ bool DroidProbe::Root::ReadProcessName(int pid, std::string& name) {
 
     name = Trim(name);
     return !name.empty();
-}
+} /* ReadProcessName */
+
+jstring DroidProbe::Root::NewJavaString(JNIEnv* env, const std::string& value) {
+    return NewJavaString(env, value.c_str());
+} /* NewJavaString */
+
+jstring DroidProbe::Root::NewJavaString(JNIEnv* env, const char* value) {
+    if (env == nullptr) {
+        return nullptr;
+    }
+
+    return env->NewStringUTF(value);
+} /* NewJavaString */
+
+jobjectArray DroidProbe::Root::NewStringArray(JNIEnv* env, jclass string_class,
+                                              const std::vector<std::string>& values) {
+    if (env == nullptr || string_class == nullptr) {
+        return nullptr;
+    }
+
+    // 创建与证据数量相等的 String 数组。
+    jobjectArray array = env->NewObjectArray(
+        static_cast<jsize>(values.size()),
+        string_class,
+        nullptr
+    );
+
+    if (array == nullptr) {
+        return nullptr;
+    }
+
+    // 将每条 Native 字符串转换成 Java String 并放入数组。
+    for (jsize i = 0; i < static_cast<jsize>(values.size()); ++i) {
+        jstring value = NewJavaString(env, values[static_cast<size_t>(i)]);
+
+        if (value == nullptr) {
+            // NewStringUTF 失败时释放已经创建的数组，让 Java 侧收到 null。
+            env->DeleteLocalRef(array);
+            return nullptr;
+        }
+
+        env->SetObjectArrayElement(array, i, value);
+        env->DeleteLocalRef(value);
+
+        // SetObjectArrayElement 本身可能产生 OutOfMemory 等 Java 异常。
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(array);
+            return nullptr;
+        }
+    }
+
+    return array;
+} /* NewStringArray */

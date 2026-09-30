@@ -456,7 +456,7 @@ namespace {
                     result,
                     0,
                     "PRCTL_PROBE_INCONCLUSIVE",
-                    value.c_str(),
+                    value,
                     "候选 prctl 探测受到权限限制或接口不可用，"
                     "无法据此判断是否存在 KernelSU"
                 );
