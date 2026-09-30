@@ -2,8 +2,8 @@
 // Created by ignite on 9/30/26.
 //
 
-#ifndef DROIDPROBE_NATIVE_DETECTOR_UTILS_
-#define DROIDPROBE_NATIVE_DETECTOR_UTILS_
+#ifndef DROIDPROBE_NATIVE_DETECTOR_UTILS_H
+#define DROIDPROBE_NATIVE_DETECTOR_UTILS_H
 
 #include <jni.h>
 #include <vector>
@@ -208,4 +208,4 @@ namespace DroidProbe {
     }
 }
 
-#endif // DROIDPROBE_NATIVE_DETECTOR_UTILS_
+#endif // DROIDPROBE_NATIVE_DETECTOR_UTILS_H
