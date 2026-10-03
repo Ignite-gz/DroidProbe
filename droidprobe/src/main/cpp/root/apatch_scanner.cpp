@@ -309,7 +309,7 @@ namespace {
                 continue;
             }
 
-            // 限制扫描数量，防止异常环境拥有巨量 PID 时消耗过多时间。
+            // 限制扫描数量，防止异常环境拥有巨量 PID 时消耗过多时间
             if (++scanned > kMaxProcessEntries) {
                 AddEvidence(
                     result,
@@ -321,16 +321,16 @@ namespace {
                 break;
             }
 
-            // 将 PID 字符串转换成整数。
+            // 将 PID 字符串转换成整数
             const int pid = std::atoi(entry->d_name);
 
-            // 读取 /proc/<pid>/comm 中的进程名字。
+            // 读取 /proc/<pid>/comm 中的进程名字
             std::string process_name;
             if (!DroidProbe::Root::ReadProcessName(pid, process_name)) {
                 continue;
             }
 
-            // 如果名字看起来与 APatch daemon 没有关系，直接跳过。
+            // 如果名字看起来与 APatch daemon 没有关系，直接跳过
             if (!IsPotentialAPatchProcessName(process_name)) {
                 continue;
             }

@@ -41,7 +41,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 
         root/kernel_su_detector.cpp root/apatch_scanner.cpp root/native_detector_utils.cpp
 
-        common/droid_probe_log.cpp
+        common/droid_probe_log.cpp common/jni_helpers.hpp common/jni_helpers.cpp
 )
 
 # Specifies libraries CMake should link to your target library. You

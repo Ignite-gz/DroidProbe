@@ -86,38 +86,54 @@ public final class MagiskDetector extends AbstractRootBinaryDetector {
         }
     }
 
+    /**
+     * 其它补充的检测
+     * @return 检查时所产生的证据(List&ltDetectionEvidence&gt)
+     */
     @Override
     protected List<DetectionEvidence> detectOthers() {
         // 检查 mount source 是否异常
         List<DetectionEvidence> evidences = new ArrayList<>();
-        List<MountInfo> mountInfos = MountUtils.getMounts();
+
+        // 检查能否读取到挂载信息
+        String[] mountInfos = MountUtils.readMountinfo();
         if (mountInfos == null) {
-            evidences.add(new DetectionEvidence(
-                "MOUNT_INFO",
-                "/proc/self/mountinfo;/proc/self/mounts;mount",
-                "无法获取当前进程的挂载信息"
-            ));
-            return evidences;
+            mountInfos = MountUtils.readMounts();
+            if (mountInfos == null) {
+                mountInfos = MountUtils.readMountCommandLine();
+                if (mountInfos == null) {
+                    evidences.add(new DetectionEvidence(
+                        "MOUNT_INFO",
+                        "/proc/self/mountinfo;/proc/self/mounts;mount",
+                        "无法获取当前进程的挂载信息"
+                    ));
+                    return evidences;
+                }
+            }
         }
-        for (MountInfo mountInfo : mountInfos) {
-            if ("magisk".equalsIgnoreCase(mountInfo.getMountSource())) {
+
+        // 遍历挂载信息
+        for (String mountInfo : mountInfos) {
+            // Log.i(TAG, mountInfo);
+            // 检查挂载源和挂载目标路径是否为 magisk
+            if (mountInfo.contains("magisk")) {
                 evidences.add(new DetectionEvidence(
                     "MOUNT_SOURCE",
-                    mountInfo.getMountSource(),
+                    mountInfo,
                     "关键系统目录的挂载源为 magisk"
                 ));
             }
 
-            // 检查 mount point 是否异常
-            String lowerCaseMountPoint = mountInfo.getMountPoint().toLowerCase();
-            if (lowerCaseMountPoint.contains("magisk") || lowerCaseMountPoint.contains("/adb/modules/")) {
+            // 检查 magisk 模块挂载
+            if (mountInfo.contains("/adb/modules/")) {
                 evidences.add(new DetectionEvidence(
                     "MOUNT_POINT",
-                    mountInfo.getMountPoint(),
-                    "关键系统目录的挂载目标路径为 magisk 或者 magisk 模块"
+                    mountInfo,
+                    "关键系统目录的挂载目标路径为 magisk 模块"
                 ));
             }
         }
+
         return evidences;
     }
 }

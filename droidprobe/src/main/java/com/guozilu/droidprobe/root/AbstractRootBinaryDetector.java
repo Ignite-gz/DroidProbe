@@ -83,7 +83,7 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
             evidences.addAll(detectBinaryExecutionEvidences(file));
         }
 
-        //
+        // 进行其他补充的检测
         evidences.addAll(detectOthers());
 
         if (evidences.isEmpty()) {
@@ -193,7 +193,7 @@ public abstract class AbstractRootBinaryDetector extends AbstractDetector {
      * 这个方法在这里是一个 stub
      * 继承这个抽象类的类，可能需要这个抽象类预定好的功能外的其他功能
      * 但需求不同，不可能涵盖所有，所以这个方法用于给派生类实现其他查找功能
-     * @return 查找时所产生的证据(List&ltDetectionEvidence&gt)
+     * @return 检查时所产生的证据(List&ltDetectionEvidence&gt)
      */
     protected List<DetectionEvidence> detectOthers() {
         return Collections.emptyList();

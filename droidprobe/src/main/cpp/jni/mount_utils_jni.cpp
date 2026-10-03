@@ -3,7 +3,10 @@
 //
 
 #include <jni.h>
+#include <fstream>
+#include <string>
 #include "mount_info.h"
+#include "jni_helpers.hpp"
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL
@@ -94,4 +97,52 @@ Java_com_guozilu_droidprobe_utils_MountUtils_getMountsNative(JNIEnv *env, jclass
     } /* for */
 
     return result;
+}
+
+extern "C"
+JNIEXPORT jobjectArray JNICALL
+Java_com_guozilu_droidprobe_utils_MountUtils_readMounts(JNIEnv* env, jclass clazz) {
+    // TODO: implement readMounts()
+    std::ifstream fin("/proc/self/mounts", std::ios_base::in);
+    std::vector<std::string> mounts;
+    std::string line;
+    while (getline(fin, line)) {
+        mounts.push_back(std::move(line));
+    }
+    return DroidProbe::NewStringArray(env, mounts);
+}
+
+extern "C"
+JNIEXPORT jobjectArray JNICALL
+Java_com_guozilu_droidprobe_utils_MountUtils_readMountinfo(JNIEnv* env, jclass clazz) {
+    // TODO: implement readMountinfo()
+    std::ifstream fin("/proc/self/mountinfo", std::ios_base::in);
+    std::vector<std::string> mountinfo;
+    std::string line;
+    while (getline(fin, line)) {
+        mountinfo.push_back(std::move(line));
+    }
+    return DroidProbe::NewStringArray(env, mountinfo);
+}
+
+extern "C"
+JNIEXPORT jobjectArray JNICALL
+Java_com_guozilu_droidprobe_utils_MountUtils_readMountCommandLine(JNIEnv* env, jclass clazz) {
+    // TODO: implement readMountCommandLine()
+    FILE* pipe = popen("mount", "r");
+
+    if (pipe == nullptr) {
+        return nullptr;
+    }
+
+    std::vector<std::string> mount;
+    char buffer[4096];
+    while (fgets(buffer, sizeof buffer, pipe) != nullptr) {
+        std::string line(buffer);
+        if (!line.empty() && line.back() == '\n') {
+            mount.push_back(std::move(line));
+        }
+    } /* while */
+
+    return DroidProbe::NewStringArray(env, mount);
 }
