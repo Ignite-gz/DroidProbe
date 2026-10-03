@@ -512,4 +512,4 @@ DroidProbe::Root::NativeScanResult DroidProbe::Root::KernelSuScanner::Scan() {
     }
 
     return result;
-}
+} /* KernelSuScanner::Scan */

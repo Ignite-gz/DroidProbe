@@ -595,4 +595,4 @@ DroidProbe::Root::NativeScanResult DroidProbe::Root::APatchScanner::Scan() {
     }
 
     return result;
-} /* Scan */
+} /* APatchScanner::Scan */

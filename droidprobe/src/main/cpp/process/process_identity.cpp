@@ -8,19 +8,19 @@
 
 uid_t DroidProbe::Process::get_process_uid() {
     return getuid();
-}
+} /* get_process_uid */
 
 uid_t DroidProbe::Process::get_process_euid() {
     return geteuid();
-}
+} /* get_process_euid */
 
 gid_t DroidProbe::Process::get_process_gid() {
     return getgid();
-}
+} /* get_process_gid */
 
 gid_t DroidProbe::Process::get_process_egid() {
     return getegid();
-}
+} /* get_process_egid */
 
 std::vector<gid_t> DroidProbe::Process::get_process_groups() {
     // 先获取当前进程补充组的数量
@@ -40,4 +40,4 @@ std::vector<gid_t> DroidProbe::Process::get_process_groups() {
 
     groups.resize(result);
     return groups;
-}
+} /* get_process_groups */

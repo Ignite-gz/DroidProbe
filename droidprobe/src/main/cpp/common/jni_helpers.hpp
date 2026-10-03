@@ -41,7 +41,7 @@ namespace DroidProbe {
     * @param env JNIEnv
     * @param java_class_name Java Class 的 C style 字符串，一个类似于 "java/lang/String" 的字符串
     * @param values 要转化的 C++ vector<_Ty>
-    * @param converter 将 C++ 的 _Ty 数据转化为 Java 数据的函数
+    * @param converter 将 C++ 的 _Ty 数据转化为 Java 数据的函数，格式大概为 jobject converter(JNIENV* env, const _Ty& value)
     * @return 如果出错了返回 nullptr，否则返回 values 对应的 Java _Ty[]
     */
     template<typename _Ty, typename ConverterFunction>
@@ -74,7 +74,7 @@ namespace DroidProbe {
 
         // 将每条 Native _Ty 转换成 Java _Ty 并放入数组
         for (jsize i = 0; i < static_cast<jsize>(values.size()); ++i) {
-            jstring value = converter(env, values[static_cast<size_t>(i)]);
+            jobject value = converter(env, values[static_cast<size_t>(i)]);
 
             if (value == nullptr) {
                 // 执行 converter 失败时释放已经创建的数组，让 Java 侧收到 null

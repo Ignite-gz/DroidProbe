@@ -68,6 +68,7 @@ public final class MountDetector extends AbstractDetector {
         }
 
         for (MountInfo mountInfo : mountInfos) {
+            // Log.i(TAG, mountInfo.toString());
             // 检查系统关键目录的 mount options 是否异常
             if (isSystemMountPointsToCheckPath(mountInfo.getMountPoint())) {
                 if (containsOption(mountInfo.getMountOptions(), "rw")) {
