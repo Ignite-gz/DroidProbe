@@ -5,7 +5,8 @@
 #include <jni.h>
 #include "kernel_su_detector.h"
 #include "native_detector_utils.h"
-#include <droid_probe_log.h>
+#include "droid_probe_log.h"
+#include <sstream>
 
 extern "C"
 JNIEXPORT jint JNICALL
@@ -14,7 +15,7 @@ Java_com_guozilu_droidprobe_root_KernelSuDetector_nativeScan(JNIEnv *env, jobjec
     // TODO: implement nativeScan()
     using namespace DroidProbe::Root;
     if (evidences == nullptr) {
-        DroidProbe::Log::error(__FUNCTION__, "%s", "List<DetectionEvidence> evidences is null!");
+        DroidProbe::Log::error(DROID_PROBE_LOG_TAG, "%s", "List<DetectionEvidence> evidences is null!");
         return 0;
     }
 

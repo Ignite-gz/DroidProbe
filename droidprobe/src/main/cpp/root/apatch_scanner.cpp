@@ -143,7 +143,7 @@ namespace {
 
         // uname 失败时，不能假设内核版本，更不能因为无法读取版本而直接判定“没有 APatch”。
         if (uname(&info) != 0) {
-            DroidProbe::Log::error(__FUNCTION__, "%s", "无法通过 uname 获取当前 Linux 内核版本，后续探针继续执行");
+            DroidProbe::Log::error(DROID_PROBE_LOG_TAG, "%s", "无法通过 uname 获取当前 Linux 内核版本，后续探针继续执行");
             AddEvidence(
                 result,
                 0,

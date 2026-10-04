@@ -4,6 +4,7 @@
 
 #include <jni.h>
 #include <vector>
+#include <sstream>
 #include "apatch_scanner.h"
 #include "droid_probe_log.h"
 
@@ -14,7 +15,7 @@ Java_com_guozilu_droidprobe_root_APatchDetector_nativeScan(JNIEnv *env, jobject 
     // TODO: implement nativeScan()
     using namespace DroidProbe::Root;
     if (evidences == nullptr) {
-        DroidProbe::Log::error(__FUNCTION__, "%s", "List<DetectionEvidence> evidences is null!");
+        DroidProbe::Log::error(DROID_PROBE_LOG_TAG, "%s", "List<DetectionEvidence> evidences is null!");
         return 0;
     }
 
