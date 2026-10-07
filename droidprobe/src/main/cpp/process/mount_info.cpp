@@ -163,7 +163,7 @@ bool DroidProbe::Process::get_mounts(std::vector<MountInfo>& mounts) {
     mounts.clear();
 
     // 第一优先级：
-    // /proc/self/mountinfo
+    // 读取 /proc/self/mountinfo 文件
     if (read_mount_info(mounts)) {
         return true;
     }
@@ -172,7 +172,7 @@ bool DroidProbe::Process::get_mounts(std::vector<MountInfo>& mounts) {
     mounts.clear();
 
     // 第二优先级：
-    // /proc/self/mounts
+    // 读取 /proc/self/mounts 文件
     if (read_mounts(mounts)) {
         return true;
     }
@@ -180,7 +180,7 @@ bool DroidProbe::Process::get_mounts(std::vector<MountInfo>& mounts) {
     mounts.clear();
 
     // 第三优先级：
-    // mount
+    // 执行 mount 命令的结果
     if (execute_mount(mounts)) {
         return true;
     }

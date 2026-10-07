@@ -35,9 +35,18 @@ public abstract class AbstractDetector implements Detector {
         }
     }
 
+    /**
+     * 最核心的检测函数部分应该在这里实现
+     * @param context Context 上下文
+     * @return DetectionResult 检测结果
+     */
     protected abstract DetectionResult doDetect(Context context);
 
-    // 检测过程中发生了异常
+    /**
+     * 检测过程中发生了异常，具体就是打印一串异常日志，然后返回发生错误时应该返回的检测结果
+     * @param throwable 发生的异常
+     * @return 发生异常时应该得到的 DetectionResult 检测结果
+     */
     private DetectionResult createErrorResult(Throwable throwable) {
         Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable);
         return new DetectionResult(getId(), getCategory(), DetectionStatus.ERROR,

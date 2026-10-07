@@ -16,6 +16,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // UI 先暂时不写，先用 logcat 去调试内容，最后再补全 UI
         DroidProbe droidProbe = new DroidProbe();
         Log.i(TAG, droidProbe.scan(this).toString());
     }
