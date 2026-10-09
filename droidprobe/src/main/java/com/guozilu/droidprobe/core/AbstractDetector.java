@@ -5,6 +5,9 @@ import android.util.Log;
 
 import java.util.Collections;
 
+/**
+ * 一个抽象类，实现了 Detector 接口，继承该类时，应该实现 doDetect 方法以进行检测功能
+ */
 public abstract class AbstractDetector implements Detector {
     private static final String TAG = "AbstractDetector";
     private final String id;
