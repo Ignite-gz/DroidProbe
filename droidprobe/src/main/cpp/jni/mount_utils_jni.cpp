@@ -51,7 +51,7 @@ static jobject NewJavaMountInfo(JNIEnv* env, const DroidProbe::Process::MountInf
     env->DeleteLocalRef(mount_info_class);
 
     return object;
-}
+} /* NewJavaMountInfo */
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL

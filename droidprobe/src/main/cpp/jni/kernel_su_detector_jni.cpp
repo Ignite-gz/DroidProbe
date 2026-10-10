@@ -27,8 +27,8 @@ Java_com_guozilu_droidprobe_root_KernelSuDetector_nativeScan(JNIEnv *env, jobjec
             return kNativeScanError;
         }
 
-        // 有阳性证据时优先返回分值，即使扫描器随后遇到局部错误。
-        // 扫描完整性由证据说明；Java 层对阳性分值正常映射风险等级。
+        // 有阳性证据时优先返回分值，即使扫描器随后遇到局部错误
+        // 扫描完整性由证据说明，Java 层对阳性分值正常映射风险等级
         if (result.risk_score > 0) {
             return static_cast<jint>(result.risk_score);
         }

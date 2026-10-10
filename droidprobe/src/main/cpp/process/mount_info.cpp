@@ -38,6 +38,7 @@ namespace {
         const std::regex re(R"(^\S+\s+\S+\s+\S+\s+\S+\s+(\S+)\s+(\S+).*?\s+-\s+(\S+)\s+(\S+)\s+(\S+))");
         std::smatch match;
 
+        // 通过正则表达式来解析出我们需要的字段
         if (std::regex_search(line, match, re)) {
             mount_info.mount_point = unescape_mount_field(match[1].str());
             mount_info.mount_options = unescape_mount_field(match[2].str());
@@ -75,6 +76,7 @@ namespace {
         const std::regex re(R"(^(\S+)\s+(\S+)\s+(\S+)\s+(\S+))");
         std::smatch match;
 
+        // 通过正则表达式来解析出我们需要的字段
         if (std::regex_search(line, match, re)) {
             mount_info.mount_source = unescape_mount_field(match[1].str());
             mount_info.mount_point = unescape_mount_field(match[2].str());
@@ -115,8 +117,9 @@ namespace {
         // 兼容旧格式: "source mount_point filesystem_type options"
         // 因为旧格式就是用空格分开每个字段的，所以全都用 \S+ 来匹配
         const std::regex re_old(R"(^(\S+)\s+(\S+)\s+(\S+)\s+(\S+))");
-
         std::smatch match;
+
+        // 通过正则表达式来解析出我们需要的字段
         if (std::regex_search(line, match, re_new)) {
             mount_info.mount_source = unescape_mount_field(match[1].str());
             mount_info.mount_point = unescape_mount_field(match[2].str());
