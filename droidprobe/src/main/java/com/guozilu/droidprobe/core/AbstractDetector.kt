@@ -1,40 +1,29 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-import android.content.Context;
-import android.util.Log;
-
-import java.util.Collections;
+import android.content.Context
+import android.util.Log
 
 /**
  * 一个抽象类，实现了 Detector 接口，继承该类时，应该实现 doDetect 方法以进行检测功能
  */
-public abstract class AbstractDetector implements Detector {
-    private static final String TAG = "AbstractDetector";
-    private final String id;
-    private final DetectionCategory category;
-
-    protected AbstractDetector(String id, DetectionCategory category) {
-        this.id = id;
-        this.category = category;
+abstract class AbstractDetector protected constructor(
+    private val id: String,
+    private val category: DetectionCategory
+) : Detector {
+    override fun getId(): String {
+        return id
     }
 
-    @Override
-    public final String getId() {
-        return id;
+    override fun getCategory(): DetectionCategory {
+        return category
     }
 
-    @Override
-    public final DetectionCategory getCategory() {
-        return category;
-    }
-
-    @Override
-    public final DetectionResult detect(Context context) {
-        try {
-            return doDetect(context);
+    override fun detect(context: Context?): DetectionResult? {
+        return try {
+            doDetect(context)
         }
-        catch (Throwable throwable) {
-            return createErrorResult(throwable);
+        catch (throwable: Throwable) {
+            createErrorResult(throwable)
         }
     }
 
@@ -43,16 +32,23 @@ public abstract class AbstractDetector implements Detector {
      * @param context Context 上下文
      * @return DetectionResult 检测结果
      */
-    protected abstract DetectionResult doDetect(Context context);
+    protected abstract fun doDetect(context: Context?): DetectionResult?
 
     /**
      * 检测过程中发生了异常，具体就是打印一串异常日志，然后返回发生错误时应该返回的检测结果
      * @param throwable 发生的异常
      * @return 发生异常时应该得到的 DetectionResult 检测结果
      */
-    private DetectionResult createErrorResult(Throwable throwable) {
-        Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable);
-        return new DetectionResult(getId(), getCategory(), DetectionStatus.ERROR,
-            RiskLevel.UNKNOWN, Collections.emptyList());
+    private fun createErrorResult(throwable: Throwable?): DetectionResult {
+        Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable)
+        return DetectionResult(
+            getId(), getCategory(), DetectionStatus.ERROR,
+            RiskLevel.UNKNOWN, mutableListOf<DetectionEvidence?>()
+        )
+    }
+
+    companion object {
+        private val TAG: String = "AbstractDetector";
     }
 }
+

@@ -1,15 +1,12 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-import android.content.Context;
+import android.content.Context
 
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionResult;
+interface Detector {
 
-public interface Detector {
+    fun getId(): String
 
-    String getId();
+    fun getCategory(): DetectionCategory
 
-    DetectionCategory getCategory();
-
-    DetectionResult detect(Context context);
+    fun detect(context: Context?): DetectionResult?
 }

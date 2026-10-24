@@ -1,43 +1,39 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import android.content.Context;
-import android.util.Log;
+import android.content.Context
+import android.util.Log
+import com.guozilu.droidprobe.core.CompositeDetector
+import com.guozilu.droidprobe.core.DetectionCategory
+import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.Detector
 
-import com.guozilu.droidprobe.core.CompositeDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionResult;
+class RootDetector : CompositeDetector("root",
+    DetectionCategory.ROOT,
+    listOf<Detector>(
+        RootAppDetector(),
+        PotentiallyRiskyAppDetector(),
+        SuDetector(),
+        SystemPropertyDetector(),
+        MountDetector(),
+        MagiskDetector(),
+        ProcessIdentityDetector(),
+        BusyBoxDetector(),
+        KernelSuDetector(),
+        APatchDetector())) {
 
-import java.util.Arrays;
-import java.util.List;
-
-public class RootDetector extends CompositeDetector {
-    private static final String TAG = "RootDetector";
-
-    public RootDetector() {
-        super("root", DetectionCategory.ROOT, Arrays.asList(
-            new RootAppDetector(),
-            new PotentiallyRiskyAppDetector(),
-            new SuDetector(),
-            new SystemPropertyDetector(),
-            new MountDetector(),
-            new MagiskDetector(),
-            new ProcessIdentityDetector(),
-            new BusyBoxDetector(),
-            new KernelSuDetector(),
-            new APatchDetector()
-        ));
-    }
-
-    @Override
-    protected DetectionResult doDetect(Context context) {
-        List<DetectionResult> results = detectChildren(context);
+    override fun doDetect(context: Context?): DetectionResult? {
+        val results: List<DetectionResult> = detectChildren(context)
 
         // 聚合 Root 结果
-        for (DetectionResult result : results) {
+        results.forEach { result ->
             Log.i(TAG, result.toString());
         }
 
         // 先看看能不能正常运行，再考虑返回结果该怎么设计
         return null;
+    }
+
+    companion object {
+        private val TAG: String = "RootDetector"
     }
 }
