@@ -8,5 +8,5 @@ interface Detector {
 
     fun getCategory(): DetectionCategory
 
-    fun detect(context: Context?): DetectionResult?
+    fun detect(context: Context?): DetectionResult
 }

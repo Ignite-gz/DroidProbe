@@ -5,7 +5,9 @@ import android.util.Log
 import com.guozilu.droidprobe.core.CompositeDetector
 import com.guozilu.droidprobe.core.DetectionCategory
 import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.DetectionStatus
 import com.guozilu.droidprobe.core.Detector
+import com.guozilu.droidprobe.core.RiskLevel
 
 class RootDetector : CompositeDetector("root",
     DetectionCategory.ROOT,
@@ -21,7 +23,7 @@ class RootDetector : CompositeDetector("root",
         KernelSuDetector(),
         APatchDetector())) {
 
-    override fun doDetect(context: Context?): DetectionResult? {
+    override fun doDetect(context: Context?): DetectionResult {
         val results: List<DetectionResult> = detectChildren(context)
 
         // 聚合 Root 结果
@@ -30,7 +32,8 @@ class RootDetector : CompositeDetector("root",
         }
 
         // 先看看能不能正常运行，再考虑返回结果该怎么设计
-        return null;
+        return DetectionResult("root_detector", DetectionCategory.ROOT, DetectionStatus.UNKNOWN,
+            RiskLevel.UNKNOWN, mutableListOf());
     }
 
     companion object {

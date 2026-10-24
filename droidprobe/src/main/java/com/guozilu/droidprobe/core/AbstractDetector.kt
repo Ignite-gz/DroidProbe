@@ -18,7 +18,7 @@ abstract class AbstractDetector protected constructor(
         return category
     }
 
-    override fun detect(context: Context?): DetectionResult? {
+    override fun detect(context: Context?): DetectionResult {
         return try {
             doDetect(context)
         }
@@ -32,7 +32,7 @@ abstract class AbstractDetector protected constructor(
      * @param context Context 上下文
      * @return DetectionResult 检测结果
      */
-    protected abstract fun doDetect(context: Context?): DetectionResult?
+    protected abstract fun doDetect(context: Context?): DetectionResult
 
     /**
      * 检测过程中发生了异常，具体就是打印一串异常日志，然后返回发生错误时应该返回的检测结果
@@ -43,7 +43,7 @@ abstract class AbstractDetector protected constructor(
         Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable)
         return DetectionResult(
             getId(), getCategory(), DetectionStatus.ERROR,
-            RiskLevel.UNKNOWN, mutableListOf<DetectionEvidence?>()
+            RiskLevel.UNKNOWN, mutableListOf()
         )
     }
 
@@ -51,4 +51,3 @@ abstract class AbstractDetector protected constructor(
         private val TAG: String = "AbstractDetector";
     }
 }
-

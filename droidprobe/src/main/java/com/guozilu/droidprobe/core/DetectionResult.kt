@@ -1,59 +1,37 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-import androidx.annotation.NonNull;
+class DetectionResult(
+    private val name: String,
+    private val category: DetectionCategory,
+    private val status: DetectionStatus,
+    private val riskLevel: RiskLevel,
+    private val evidences: List<DetectionEvidence>) {
 
-import java.util.Collections;
-import java.util.List;
-
-public final class DetectionResult {
-    private final String name;
-    private final DetectionCategory category;
-    private final DetectionStatus status;
-    private final RiskLevel riskLevel;
-    private final List<DetectionEvidence> evidences;
-
-    public DetectionResult(String name, DetectionCategory category, DetectionStatus status,
-        RiskLevel riskLevel, List<DetectionEvidence> evidences) {
-
-        this.name = name;
-        this.category = category;
-        this.status = status;
-        this.riskLevel = riskLevel;
-        this.evidences =
-            evidences == null
-            ? Collections.emptyList()
-            : Collections.unmodifiableList(evidences);
+    fun getName(): String {
+        return name
     }
 
-    public String getName() {
-        return name;
+    fun getCategory(): DetectionCategory {
+        return category
     }
 
-    public DetectionCategory getCategory() {
-        return category;
+    fun getStatus(): DetectionStatus {
+        return status
     }
 
-    public DetectionStatus getStatus() {
-        return status;
+    fun getRiskLevel(): RiskLevel {
+        return riskLevel
     }
 
-    public RiskLevel getRiskLevel() {
-        return riskLevel;
+    fun getEvidences(): List<DetectionEvidence> {
+        return evidences
     }
 
-    public List<DetectionEvidence> getEvidences() {
-        return evidences;
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-        return "DetectionResult{" +
-            "name='" + name + '\'' +
-            ", category=" + category +
-            ", status=" + status +
-            ", riskLevel=" + riskLevel +
-            ", evidence=" + evidences +
-            '}';
+    override fun toString(): String {
+        return "DetectionResult{name='$name'" +
+                ", category=$category" +
+                ", status=$status" +
+                ", riskLevel=$riskLevel" +
+                ", evidence=$evidences}"
     }
 }

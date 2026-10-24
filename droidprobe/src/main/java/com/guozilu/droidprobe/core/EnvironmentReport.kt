@@ -1,71 +1,48 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-import android.os.Build;
+import android.os.Build
+import java.util.stream.Collectors
 
-import androidx.annotation.NonNull;
+class EnvironmentReport(
+    private val timestamp: Long,
+    private val results: MutableList<DetectionResult>) {
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
-
-public class EnvironmentReport {
-    private final long timestamp;
-    private final List<DetectionResult> results;
-
-    public EnvironmentReport(long timestamp, List<DetectionResult> results) {
-        this.timestamp = timestamp;
-        this.results = Collections.unmodifiableList(results);
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public List<DetectionResult> getResults() {
-        return results;
-    }
-
-    public List<DetectionResult> getDetectedResults() {
+    fun getDetectedResults(): MutableList<DetectionResult> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return results.stream()
-                .filter(result -> result.getStatus() == DetectionStatus.DETECTED)
-                .collect(Collectors.toList());
+                .filter { result -> result.getStatus() == DetectionStatus.DETECTED }
+                .collect(Collectors.toList())
         }
         else {
-            List<DetectionResult> retval = new ArrayList<>();
-            for (DetectionResult result : results) {
-                if (result.getStatus() == DetectionStatus.DETECTED) {
-                    retval.add(result);
+            val retval: MutableList<DetectionResult> = ArrayList()
+            results.forEach {
+                result -> if (result.getStatus() == DetectionStatus.DETECTED) {
+                    retval.add(result)
                 }
             }
-            return retval;
+            return retval
         }
     }
 
-    public List<DetectionResult> getResults(DetectionCategory category) {
+    fun getResults(category: DetectionCategory): MutableList<DetectionResult> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             return results.stream()
-                .filter(result -> result.getCategory() == category)
-                .collect(Collectors.toList());
+                .filter { result -> result.getCategory() == category }
+                .collect(Collectors.toList())
         }
         else {
-            List<DetectionResult> retval = new ArrayList<>();
-            for (DetectionResult result : results) {
+            val retval: MutableList<DetectionResult> = ArrayList()
+            results.forEach {
+                result ->
                 if (result.getCategory() == category) {
-                    retval.add(result);
+                    retval.add(result)
                 }
             }
-            return retval;
+            return retval
         }
     }
 
-    @NonNull
-    @Override
-    public String toString() {
-        return "EnvironmentReport{" +
-            "timestamp=" + timestamp +
-            ", results=" + results +
-            '}';
+    override fun toString(): String {
+        return "EnvironmentReport{timestamp=$timestamp, results=$results}"
     }
 }

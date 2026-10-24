@@ -1,9 +1,6 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-import android.content.Context;
-
-import java.util.ArrayList;
-import java.util.List;
+import android.content.Context
 
 /**
  * 一个抽象类，继承了 AbstractDetector，用来同时完成多个检测分支
@@ -11,13 +8,11 @@ import java.util.List;
  * 应在重写 doDetect() 方法时，在其中调用 detectChildren() 方法来完成对应的逻辑，否则这些子分支的检测，
  * 将不会被执行
  */
-public abstract class CompositeDetector extends AbstractDetector {
-    private final List<Detector> detectors;
-
-    protected CompositeDetector(String id, DetectionCategory category, List<Detector> detectors) {
-        super(id, category);
-        this.detectors = detectors;
-    }
+abstract class CompositeDetector(
+    id: String,
+    category: DetectionCategory,
+    private val detectors: List<Detector>
+) : AbstractDetector(id, category) {
 
     /**
      * 遍历 detectors，逐个执行 Detector.detect(context)
@@ -25,11 +20,13 @@ public abstract class CompositeDetector extends AbstractDetector {
      * @param context Context context 上下文
      * @return 所有分支的 Detector 的检测结果的聚合
      */
-    protected final List<DetectionResult> detectChildren(Context context) {
-        List<DetectionResult> results = new ArrayList<>();
-        for (Detector detector : detectors) {
-            results.add(detector.detect(context));
-        }
-        return results;
+    protected fun detectChildren(context: Context?): MutableList<DetectionResult> {
+        val results: MutableList<DetectionResult> = ArrayList()
+        detectors.forEach { detector -> results.add(detector.detect(context)) }
+        return results
+    }
+
+    companion object {
+        private val TAG: String = "CompositeDetector"
     }
 }

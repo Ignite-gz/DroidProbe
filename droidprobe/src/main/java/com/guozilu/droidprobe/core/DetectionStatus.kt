@@ -1,6 +1,6 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-public enum DetectionStatus {
+enum class DetectionStatus {
     DETECTED,
     NOT_DETECTED,
     NOT_SUPPORTED,

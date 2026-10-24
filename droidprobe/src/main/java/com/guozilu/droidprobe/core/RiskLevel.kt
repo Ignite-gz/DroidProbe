@@ -1,6 +1,6 @@
-package com.guozilu.droidprobe.core;
+package com.guozilu.droidprobe.core
 
-public enum RiskLevel {
+enum class RiskLevel {
     UNKNOWN,
     NONE,
     LOW,
