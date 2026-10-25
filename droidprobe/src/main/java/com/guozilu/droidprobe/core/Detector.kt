@@ -3,10 +3,9 @@ package com.guozilu.droidprobe.core
 import android.content.Context
 
 interface Detector {
+    val id: String
 
-    fun getId(): String
-
-    fun getCategory(): DetectionCategory
+    val category: DetectionCategory
 
     fun detect(context: Context?): DetectionResult
 }

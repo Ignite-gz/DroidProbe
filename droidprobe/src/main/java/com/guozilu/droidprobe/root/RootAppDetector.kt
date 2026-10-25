@@ -1,111 +1,107 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import android.content.Context;
-import android.content.pm.PackageManager;
-
-import com.guozilu.droidprobe.core.AbstractDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.DetectionStatus;
-import com.guozilu.droidprobe.core.RiskLevel;
-import com.guozilu.droidprobe.utils.PackagesUtils;
-
-import java.util.ArrayList;
-import java.util.List;
+import android.content.Context
+import android.content.pm.PackageManager
+import com.guozilu.droidprobe.core.AbstractDetector
+import com.guozilu.droidprobe.core.DetectionCategory
+import com.guozilu.droidprobe.core.DetectionEvidence
+import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.DetectionStatus
+import com.guozilu.droidprobe.core.RiskLevel
+import com.guozilu.droidprobe.utils.PackagesUtils
 
 /**
  * 检查手机上有没有安装用于管理 root 的软件包名，如 Magisk
  * 发现软件其实也不代表真的 root 了，但这个类就是专门查包名的
  */
-public final class RootAppDetector extends AbstractDetector {
-    private static final String TAG = "RootAppDetector";
+class RootAppDetector : AbstractDetector(
+    "root_app",
+    DetectionCategory.ROOT) {
 
-    private static final String[] ROOT_APP_PACKAGES = {
-        // Magisk
-        "com.topjohnwu.magisk",
+    override fun doDetect(context: Context?): DetectionResult {
+        val packageManager: PackageManager = context!!.packageManager
 
-        // Magisk Alpha
-        "io.github.vvb2060.magisk",
+        val evidence: MutableList<DetectionEvidence> = ArrayList()
 
-        // Kitsune Mask（狐狸面具）
-        "io.github.huskydg.magisk",
-
-        // KernelSU
-        "me.weishu.kernelsu",
-
-        // KernelSU Next
-        "com.rifsxd.ksunext",
-
-        // SuKiSU
-        "org.sukisu.manager",
-
-        // SukiSU Ultra
-        "com.sukisu.ultra",
-
-        // APatch
-        "me.bmax.apatch",
-        "me.garfieldhan.apatch.next",
-
-        // APatch Next
-        "me.garfieldhan.apatch.next",
-
-        // SuperSU
-        "eu.chainfire.supersu",
-
-        // Superuser
-        "com.koushikdutta.superuser",
-        "me.phh.superuser",
-        "com.noshufou.android.su",
-        "com.noshufou.android.su.elite",
-        "com.yellowes.su",
-
-        // KingRoot
-        "com.kingroot.kinguser",
-
-        // Kingo Root
-        "com.kingo.root",
-
-        // RPC 框架
-        "com.sekiro",
-        "com.sekiro.rpc"
-    };
-
-    public RootAppDetector() {
-        super("root_app", DetectionCategory.ROOT);
-    }
-
-    @Override
-    protected DetectionResult doDetect(Context context) {
-        PackageManager packageManager = context.getPackageManager();
-
-        List<DetectionEvidence> evidence = new ArrayList<>();
-
-        for (String packageName : ROOT_APP_PACKAGES) {
+        ROOT_APP_PACKAGES.forEach { packageName ->
             if (PackagesUtils.isPackageInstalled(packageManager, packageName)) {
-                evidence.add(new DetectionEvidence(
+                evidence.add(DetectionEvidence(
                     "PACKAGE",
                     packageName,
                     "发现管理 Root 的相关应用"
-                ));
+                ))
             }
         }
 
         if (evidence.isEmpty()) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
+            return DetectionResult(
+                id,
+                category,
                 DetectionStatus.NOT_DETECTED,
                 RiskLevel.NONE,
                 evidence
-            );
+            )
         }
-        return new DetectionResult(
-            getId(),
-            getCategory(),
+        return DetectionResult(
+            id,
+            category,
             DetectionStatus.DETECTED,
-            RiskLevel.MEDIUM, // 发现包不代表已经 root 了，所以这里定义为中等风险
+            RiskLevel.MEDIUM,   // 发现包不代表已经 root 了，所以这里定义为中等风险
             evidence
-        );
+        )
+    }
+
+    companion object {
+        private const val TAG: String = "RootAppDetector";
+
+        private val ROOT_APP_PACKAGES: Array<String> = arrayOf(
+            // Magisk
+            "com.topjohnwu.magisk",
+
+            // Magisk Alpha
+            "io.github.vvb2060.magisk",
+
+            // Kitsune Mask（狐狸面具）
+            "io.github.huskydg.magisk",
+
+            // KernelSU
+            "me.weishu.kernelsu",
+
+            // KernelSU Next
+            "com.rifsxd.ksunext",
+
+            // SuKiSU
+            "org.sukisu.manager",
+
+            // SukiSU Ultra
+            "com.sukisu.ultra",
+
+            // APatch
+            "me.bmax.apatch",
+            "me.garfieldhan.apatch.next",
+
+            // APatch Next
+            "me.garfieldhan.apatch.next",
+
+            // SuperSU
+            "eu.chainfire.supersu",
+
+            // Superuser
+            "com.koushikdutta.superuser",
+            "me.phh.superuser",
+            "com.noshufou.android.su",
+            "com.noshufou.android.su.elite",
+            "com.yellowes.su",
+
+            // KingRoot
+            "com.kingroot.kinguser",
+
+            // Kingo Root
+            "com.kingo.root",
+
+            // RPC 框架
+            "com.sekiro",
+            "com.sekiro.rpc"
+        )
     }
 }

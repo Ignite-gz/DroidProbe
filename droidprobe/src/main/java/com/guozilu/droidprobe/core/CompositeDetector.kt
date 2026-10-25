@@ -26,10 +26,6 @@ abstract class CompositeDetector(
         return results
     }
 
-    override fun getId(): String = id
-
-    override fun getCategory(): DetectionCategory = category
-
     companion object {
         private const val TAG: String = "CompositeDetector"
     }
