@@ -1,11 +1,7 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.RiskLevel;
-
-import org.jetbrains.annotations.NotNull;
-
-import java.util.List;
+import com.guozilu.droidprobe.core.DetectionEvidence
+import com.guozilu.droidprobe.core.RiskLevel
 
 /**
  * KernelSU 内核级 Root 环境检测器。
@@ -34,16 +30,9 @@ import java.util.List;
  * KernelSU 版本、分支、集成方式或设备 ROM 改变。发布前应在已知干净设备及
  * 不同 KernelSU 版本的实机上验证命中率和误报率。</p>
  */
-public final class KernelSuDetector extends AbstractNativeRootDetector {
-    private static final String TAG = "KernelSuDetector";
-
-    static {
-        System.loadLibrary("droidprobe");
-    }
-
-    public KernelSuDetector() {
-        super("kernel_su", "KernelSU");
-    }
+class KernelSuDetector : AbstractNativeRootDetector(
+    "kernel_su",
+    "KernelSU") {
 
     /**
      * 将 Native 层最高命中分值映射为 DroidProbe 的统一风险等级。
@@ -51,28 +40,27 @@ public final class KernelSuDetector extends AbstractNativeRootDetector {
      * @param riskScore Native 层返回的最高证据分值
      * @return 与分值对应的风险等级
      */
-    @Override
-    protected RiskLevel getRiskLevel(int riskScore) {
+    override fun getRiskLevel(riskScore: Int): RiskLevel {
         if (riskScore >= 90) {
-            return RiskLevel.CRITICAL;
+            return RiskLevel.CRITICAL
         }
         else if (riskScore >= 75) {
-            return RiskLevel.HIGH;
+            return RiskLevel.HIGH
         }
         else if (riskScore >= 60) {
-            return RiskLevel.MEDIUM_HIGH;
+            return RiskLevel.MEDIUM_HIGH
         }
         else if (riskScore >= 40) {
-            return RiskLevel.MEDIUM;
+            return RiskLevel.MEDIUM
         }
         else if (riskScore > 0) {
-            return RiskLevel.LOW;
+            return RiskLevel.LOW
         }
         else if (riskScore == 0) {
-            return RiskLevel.NONE;
+            return RiskLevel.NONE
         }
         else {
-            return RiskLevel.UNKNOWN;
+            return RiskLevel.UNKNOWN
         }
     }
 
@@ -93,6 +81,13 @@ public final class KernelSuDetector extends AbstractNativeRootDetector {
      * @param evidences 用于接收 Native 层检测证据的 Java List
      * @return 最高命中分值或上述状态码
      */
-    @Override
-    protected native int nativeScan(@NotNull List<DetectionEvidence> evidences);
+    external override fun nativeScan(evidences: MutableList<DetectionEvidence>): Int
+
+    companion object {
+        private const val TAG: String = "KernelSuDetector"
+
+        init {
+            System.loadLibrary("droidprobe")
+        }
+    }
 }

@@ -55,7 +55,7 @@ static jobject NewJavaMountInfo(JNIEnv* env, const DroidProbe::Process::MountInf
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL
-Java_com_guozilu_droidprobe_utils_MountUtils_getMountsNative(JNIEnv *env, jclass clazz) {
+Java_com_guozilu_droidprobe_utils_MountUtils_getMountsNative(JNIEnv *env, jobject thiz) {
     // TODO: implement getMountsNative()
     std::vector<DroidProbe::Process::MountInfo> mounts;
 
@@ -73,7 +73,7 @@ Java_com_guozilu_droidprobe_utils_MountUtils_getMountsNative(JNIEnv *env, jclass
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL
-Java_com_guozilu_droidprobe_utils_MountUtils_readMounts(JNIEnv* env, jclass clazz) {
+Java_com_guozilu_droidprobe_utils_MountUtils_readMounts(JNIEnv* env, jobject thiz) {
     // TODO: implement readMounts()
     std::ifstream fin("/proc/self/mounts", std::ios_base::in);
     std::vector<std::string> mounts;
@@ -86,7 +86,7 @@ Java_com_guozilu_droidprobe_utils_MountUtils_readMounts(JNIEnv* env, jclass claz
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL
-Java_com_guozilu_droidprobe_utils_MountUtils_readMountinfo(JNIEnv* env, jclass clazz) {
+Java_com_guozilu_droidprobe_utils_MountUtils_readMountinfo(JNIEnv* env, jobject thiz) {
     // TODO: implement readMountinfo()
     std::ifstream fin("/proc/self/mountinfo", std::ios_base::in);
     std::vector<std::string> mountinfo;
@@ -99,7 +99,7 @@ Java_com_guozilu_droidprobe_utils_MountUtils_readMountinfo(JNIEnv* env, jclass c
 
 extern "C"
 JNIEXPORT jobjectArray JNICALL
-Java_com_guozilu_droidprobe_utils_MountUtils_readMountCommandLine(JNIEnv* env, jclass clazz) {
+Java_com_guozilu_droidprobe_utils_MountUtils_readMountCommandLine(JNIEnv* env, jobject thiz) {
     // TODO: implement readMountCommandLine()
     FILE* pipe = popen("mount", "r");
 

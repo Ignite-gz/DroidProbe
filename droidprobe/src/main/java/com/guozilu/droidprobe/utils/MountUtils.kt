@@ -1,29 +1,15 @@
-package com.guozilu.droidprobe.utils;
+package com.guozilu.droidprobe.utils
 
-import android.util.Log;
+object MountUtils {
+    private const val TAG: String = "MountUtils"
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-public final class MountUtils {
-    private static final String TAG = "MountUtils";
-
-    static {
-        System.loadLibrary("droidprobe");
+    init {
+        System.loadLibrary("droidprobe")
     }
 
-    public static List<MountInfo> getMounts() {
-        MountInfo[] mounts = getMountsNative();
-
-        if (mounts == null) {
-            return null;
-        }
-
-        return Arrays.asList(mounts);
+    fun getMounts(): List<MountInfo>? {
+        val mounts: Array<MountInfo> = getMountsNative() ?: return null
+        return listOf(*mounts)
     }
 
     /**
@@ -32,23 +18,23 @@ public final class MountUtils {
      * 最终组成 MountInfo[] 对象
      * @return 如果读取成功，那么返回对应的 MountInfo[]，否则返回 null
      */
-    private static native MountInfo[] getMountsNative();
+    external fun getMountsNative(): Array<MountInfo>?
 
     /**
      * 读取 /proc/self/mounts 文件，将文件的每一行解析为一个 String 对象，最终组成 String[] 对象
      * @return 读取成功，那么返回对应的 String[]，否则返回 null
      */
-    public static native String[] readMounts();
+    external fun readMounts(): Array<String>?
 
     /**
      * 读取 /proc/self/mountinfo 文件，将文件的每一行解析为一个 String 对象，最终组成 String[] 对象
      * @return 读取成功，那么返回对应的 String[]，否则返回 null
      */
-    public static native String[] readMountinfo();
+    external fun readMountinfo(): Array<String>?
 
     /**
      * 读取 mount 命令的输出结果，将输出内容的每一行解析为一个 String 对象，最终组成 String[] 对象
      * @return 读取成功，那么返回对应的 String[] 对象，否则返回 null
      */
-    public native static String[] readMountCommandLine();
+    external fun readMountCommandLine(): Array<String>?
 }

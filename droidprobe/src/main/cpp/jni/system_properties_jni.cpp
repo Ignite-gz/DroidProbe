@@ -8,7 +8,7 @@
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_guozilu_droidprobe_utils_SystemPropertiesUtils_getprop(JNIEnv *env, jclass clazz, jstring key) {
+Java_com_guozilu_droidprobe_utils_SystemPropertiesUtils_getprop(JNIEnv *env, jobject thiz, jstring key) {
     if (key == nullptr) {
         return nullptr;
     }

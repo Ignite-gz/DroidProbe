@@ -119,7 +119,7 @@ abstract class AbstractNativeRootDetector(
      * @param evidences 用于接收 Native 层检测证据的 Java List
      * @return 最高命中分值或上述状态码
      */
-    protected abstract fun nativeScan(evidences: List<DetectionEvidence>): Int
+    protected abstract fun nativeScan(evidences: MutableList<DetectionEvidence>): Int
 
     companion object {
         private const val TAG: String = "AbstractNativeRootDetector"

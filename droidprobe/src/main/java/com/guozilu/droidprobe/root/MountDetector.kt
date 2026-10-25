@@ -1,19 +1,14 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import android.content.Context;
-import android.util.Log;
-
-import com.guozilu.droidprobe.core.AbstractDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.DetectionStatus;
-import com.guozilu.droidprobe.core.RiskLevel;
-import com.guozilu.droidprobe.utils.MountInfo;
-import com.guozilu.droidprobe.utils.MountUtils;
-
-import java.util.ArrayList;
-import java.util.List;
+import android.content.Context
+import com.guozilu.droidprobe.core.AbstractDetector
+import com.guozilu.droidprobe.core.DetectionCategory
+import com.guozilu.droidprobe.core.DetectionEvidence
+import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.DetectionStatus
+import com.guozilu.droidprobe.core.RiskLevel
+import com.guozilu.droidprobe.utils.MountInfo
+import com.guozilu.droidprobe.utils.MountUtils
 
 /**
  * 检查本来应该只读的系统目录，当前是不是以 rw（read-write）方式挂载
@@ -23,122 +18,122 @@ import java.util.List;
  * 执行 mount 命令查看内容，然后把每行的内容解析为一个 MountInfo 对象
  * 检查挂载的 mount point，mount options，FileSystem type，mount source，super options 是否异常
  */
-public final class MountDetector extends AbstractDetector {
-    private static final String TAG = "MountDetector";
+class MountDetector : AbstractDetector(
+    "mount",
+    DetectionCategory.ROOT) {
 
-    /**
-     * 提前预设的目录，一般情况下这些目录是不可能有写的权限的
-     */
-    private static final String[] SYSTEM_MOUNT_POINTS_TO_CHECK_PATHS = {
-        "/system",
-        "/system/bin",
-        "/system/sbin",
-        "/system/xbin",
-        "/system_ext",
-        "/vendor",
-        "/vendor/bin",
-        "/product",
-        "/odm",
-        "/sbin",
-        "/etc"
-    };
+    override fun doDetect(context: Context?): DetectionResult {
+        val evidences: MutableList<DetectionEvidence> = ArrayList()
 
-    public MountDetector() {
-        super("mount", DetectionCategory.ROOT);
-    }
-
-    @Override
-    protected DetectionResult doDetect(Context context) {
-        List<DetectionEvidence> evidences = new ArrayList<>();
-
-        List<MountInfo> mountInfos = MountUtils.getMounts();
+        val mountInfos: List<MountInfo>? = MountUtils.getMounts()
         if (mountInfos == null) {
-            evidences.add(new DetectionEvidence(
+            evidences.add(DetectionEvidence(
                 "MOUNT_INFO",
                 "/proc/self/mountinfo;/proc/self/mounts;mount",
                 "无法获取当前进程的挂载信息"
-            ));
-            return new DetectionResult(
-                getId(),
-                getCategory(),
+            ))
+            return DetectionResult(
+                id,
+                category,
                 DetectionStatus.UNKNOWN,
                 RiskLevel.LOW,  // 正常来说肯定是可以获取到，获取不到是比较奇怪的一件事
                 evidences
-            );
+            )
         }
 
-        for (MountInfo mountInfo : mountInfos) {
-            // Log.i(TAG, mountInfo.toString());
+        for (mountInfo: MountInfo in mountInfos) {
+            // Log.i(TAG, mountInfo.toString())
             // 检查系统关键目录的 mount options 是否异常
-            if (isSystemMountPointsToCheckPath(mountInfo.getMountPoint())) {
-                if (containsOption(mountInfo.getMountOptions(), "rw")) {
-                    evidences.add(new DetectionEvidence(
+            if (isSystemMountPointsToCheckPath(mountInfo.mountPoint)) {
+                if (containsOption(mountInfo.mountOptions, "rw")) {
+                    evidences.add(DetectionEvidence(
                         "MOUNT_OPTION",
-                        mountInfo.getMountPoint(),
+                        mountInfo.mountPoint,
                         "关键系统目录以 rw 方式挂载"
-                    ));
+                    ))
                 }
             }
 
             // 检查 FileSystem type 是否异常
-            if ("overlay".equalsIgnoreCase(mountInfo.getFilesystemType())) {
-                evidences.add(new DetectionEvidence(
+            if ("overlay".equals(mountInfo.filesystemType, true)) {
+                evidences.add(DetectionEvidence(
                     "OVERLAYFS",
-                    mountInfo.getFilesystemType(),
+                    mountInfo.filesystemType,
                     "关键系统目录使用 overlay 文件系统"
-                ));
+                ))
             }
         }
         if (!evidences.isEmpty()) {
-            return new DetectionResult(
-                getId(),
-                getCategory(),
+            return DetectionResult(
+                id,
+                category,
                 DetectionStatus.DETECTED,
                 RiskLevel.HIGH,
                 evidences
-            );
+            )
         }
-        return new DetectionResult(
-            getId(),
-            getCategory(),
+        return DetectionResult(
+            id,
+            category,
             DetectionStatus.NOT_DETECTED,
             RiskLevel.NONE,
             evidences
-        );
+        )
     }
 
-    /**
-     * 判断挂载路径是否在提前预设好的、指定好的路径中，这些预设的路径，正常情况下一定不可能有写的权限
-     * @param mountPoint 需要判断的挂载路径
-     * @return 如果在就返回 true，否则返回 false
-     */
-    private static boolean isSystemMountPointsToCheckPath(String mountPoint) {
-        for (String path : SYSTEM_MOUNT_POINTS_TO_CHECK_PATHS) {
-            if (path.equals(mountPoint)) {
-                return true;
+    companion object {
+        private const val TAG = "MountDetector"
+
+        /**
+         * 提前预设的目录，一般情况下这些目录是不可能有写的权限的
+         */
+        private val SYSTEM_MOUNT_POINTS_TO_CHECK_PATHS: Array<String> = arrayOf(
+            "/system",
+            "/system/bin",
+            "/system/sbin",
+            "/system/xbin",
+            "/system_ext",
+            "/vendor",
+            "/vendor/bin",
+            "/product",
+            "/odm",
+            "/sbin",
+            "/etc"
+        )
+
+        /**
+         * 判断挂载路径是否在提前预设好的、指定好的路径中，这些预设的路径，正常情况下一定不可能有写的权限
+         * @param mountPoint 需要判断的挂载路径
+         * @return 如果在就返回 true，否则返回 false
+         */
+        private fun isSystemMountPointsToCheckPath(mountPoint: String): Boolean {
+            for (path: String in SYSTEM_MOUNT_POINTS_TO_CHECK_PATHS) {
+                if (path == mountPoint) {
+                    return true
+                }
             }
+
+            return false
         }
 
-        return false;
-    }
-
-    /**
-     * 判断 target 在不在挂载选项 options 中，挂载选项的内容大概像 ro,seclabel,relatime 这个样子
-     * @param options 挂载选项
-     * @param target 需要检测在不在 options 中的一个 option
-     * @return 如果 target 在 options 中返回 true，否则返回 false
-     */
-    private static boolean containsOption(String options, String target) {
-        if (options == null || target == null) {
-            return false;
-        }
-
-        for (String option : options.split(",")) {
-            if (target.equalsIgnoreCase(option.trim())) {
-                return true;
+        /**
+         * 判断 target 在不在挂载选项 options 中，挂载选项的内容大概像 ro,seclabel,relatime 这个样子
+         * @param options 挂载选项
+         * @param target 需要检测在不在 options 中的一个 option
+         * @return 如果 target 在 options 中返回 true，否则返回 false
+         */
+        private fun containsOption(options: String?, target: String?): Boolean {
+            if (options == null || target == null) {
+                return false
             }
-        }
 
-        return false;
+            for (option: String in options.split(",")) {
+                if (target.equals(option.trim(), true)) {
+                    return true
+                }
+            }
+
+            return false
+        }
     }
 }

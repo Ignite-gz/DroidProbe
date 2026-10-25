@@ -1,20 +1,7 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.os.Build;
-
-import com.guozilu.droidprobe.core.AbstractDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.DetectionStatus;
-import com.guozilu.droidprobe.core.RiskLevel;
-
-import org.jetbrains.annotations.NotNull;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.guozilu.droidprobe.core.DetectionEvidence
+import com.guozilu.droidprobe.core.RiskLevel
 
 /**
  * APatch 环境检测器。
@@ -45,38 +32,29 @@ import java.util.List;
  * 因为这毕竟是内核层面的 root 方案，目前只能检测一些老版本安卓 + 老版本 APatch，那如果想检测
  * 新版本的话，目前我还是无从下手的，也许以后会深度研究实现这个检测</p>
  */
-public final class APatchDetector extends AbstractNativeRootDetector {
-    private static final String TAG = "APatchDetector";
+class APatchDetector : AbstractNativeRootDetector(
+    // APatch 本质上属于 Root / kernel-root 环境，因此归入 ROOT 分类
+    "apatch",
+    "APatch") {
 
-    static {
-        // 加载 DroidProbe 的 Native 库，后续 nativeScanAPatch() 会由 JNI 层实现。
-        System.loadLibrary("droidprobe");
-    }
-
-    public APatchDetector() {
-        // APatch 本质上属于 Root / kernel-root 环境，因此归入 ROOT 分类。
-        super("apatch", "APatch");
-    }
-
-    @Override
-    protected RiskLevel getRiskLevel(int riskScore) {
-        if (riskScore >= 85) {
-            return RiskLevel.CRITICAL;
+    override fun getRiskLevel(riskScore: Int): RiskLevel {
+        return if (riskScore >= 85) {
+            RiskLevel.CRITICAL
         }
         else if (riskScore >= 65) {
-            return RiskLevel.MEDIUM_HIGH;
+            RiskLevel.MEDIUM_HIGH
         }
         else if (riskScore >= 40) {
-            return RiskLevel.MEDIUM;
+            RiskLevel.MEDIUM
         }
         else if (riskScore > 0) {
-            return RiskLevel.LOW;
+            RiskLevel.LOW
         }
         else if (riskScore == 0) {
-            return RiskLevel.NONE;
+            RiskLevel.NONE
         }
         else {
-            return RiskLevel.UNKNOWN;
+            RiskLevel.UNKNOWN
         }
     }
 
@@ -97,6 +75,14 @@ public final class APatchDetector extends AbstractNativeRootDetector {
      * @param evidences 用于接收 Native 层检测证据的 Java List
      * @return 最高命中分值或上述状态码
      */
-    @Override
-    protected native int nativeScan(@NotNull List<DetectionEvidence> evidences);
+    external override fun nativeScan(evidences: MutableList<DetectionEvidence>): Int
+
+    companion object {
+        private const val TAG: String = "APatchDetector"
+
+        init {
+            // 加载 DroidProbe 的 Native 库，后续 nativeScanAPatch() 会由 JNI 层实现。
+            System.loadLibrary("droidprobe");
+        }
+    }
 }

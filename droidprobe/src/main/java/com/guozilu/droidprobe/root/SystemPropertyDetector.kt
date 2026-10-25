@@ -1,18 +1,14 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
-import android.content.Context;
-import android.os.Build;
-
-import com.guozilu.droidprobe.core.AbstractDetector;
-import com.guozilu.droidprobe.core.DetectionCategory;
-import com.guozilu.droidprobe.core.DetectionEvidence;
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.DetectionStatus;
-import com.guozilu.droidprobe.core.RiskLevel;
-import com.guozilu.droidprobe.utils.SystemPropertiesUtils;
-
-import java.util.ArrayList;
-import java.util.List;
+import android.content.Context
+import android.os.Build
+import com.guozilu.droidprobe.core.AbstractDetector
+import com.guozilu.droidprobe.core.DetectionCategory
+import com.guozilu.droidprobe.core.DetectionEvidence
+import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.DetectionStatus
+import com.guozilu.droidprobe.core.RiskLevel
+import com.guozilu.droidprobe.utils.SystemPropertiesUtils
 
 /**
  * 这个类检查危险的 prop
@@ -26,147 +22,146 @@ import java.util.List;
  * 而没有使用 BUild.TAGS 也就是 test-keys 或者 release-keys，因为这不能说明设备 root 了
  * 后面会有 test-keys 的检测可能再用到它
  */
-public final class SystemPropertyDetector extends AbstractDetector {
-    private static final String TAG = "SystemPropertyDetector";
+class SystemPropertyDetector : AbstractDetector(
+    "system_property",
+    DetectionCategory.ROOT) {
 
-    public SystemPropertyDetector() {
-        super("system_property", DetectionCategory.ROOT);
-    }
-
-    @Override
-    protected DetectionResult doDetect(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return evaluateLessTiramisu();
+    override fun doDetect(context: Context?): DetectionResult {
+        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            evaluateLessTiramisu()
         }
         else {
-            return evaluateGreaterEqualTiramisu();
+            evaluateGreaterEqualTiramisu()
         }
     }
 
     // 低于安卓13的环境
-    private DetectionResult evaluateLessTiramisu() {
-        DetectionStatus detectionStatus = DetectionStatus.NOT_DETECTED;
-        RiskLevel riskLevel = RiskLevel.NONE;
-        List<DetectionEvidence> evidences = new ArrayList<>();
+    private fun evaluateLessTiramisu(): DetectionResult {
+        var detectionStatus: DetectionStatus = DetectionStatus.NOT_DETECTED
+        var riskLevel: RiskLevel = RiskLevel.NONE
+        val evidences: MutableList<DetectionEvidence> = ArrayList()
 
-        String debuggable = SystemPropertiesUtils.getprop("ro.debuggable");
-        String secure = SystemPropertiesUtils.getprop("ro.secure");
+        val debuggable: String? = SystemPropertiesUtils.getprop("ro.debuggable")
+        val secure: String? = SystemPropertiesUtils.getprop("ro.secure")
 
         // 都读取到了
         if (debuggable != null && secure != null) {
-            if (debuggable.equals("1") || secure.equals("0")) {
-                detectionStatus = DetectionStatus.DETECTED;
-                riskLevel = RiskLevel.CRITICAL;
-                if (debuggable.equals("1")) {
-                    evidences.add(new DetectionEvidence(
+            if (debuggable == "1" || secure == "0") {
+                detectionStatus = DetectionStatus.DETECTED
+                riskLevel = RiskLevel.CRITICAL
+                if (debuggable == "1") {
+                    evidences.add(DetectionEvidence(
                         "SYSTEM_PROPERTY",
                         "ro.debuggable",
                         "ro.debuggable == 1"
-                    ));
+                    ))
                 }
-                if (secure.equals("0")) {
-                    evidences.add(new DetectionEvidence(
+                if (secure == "0") {
+                    evidences.add(DetectionEvidence(
                         "SYSTEM_PROPERTY",
                         "ro.secure",
                         "ro.secure == 0"
-                    ));
+                    ))
                 }
             }
         }
         else {  // 有一个或者两个没读取到
-            detectionStatus = DetectionStatus.UNKNOWN;
-            riskLevel = RiskLevel.UNKNOWN;
-            evidences.add(new DetectionEvidence(
+            detectionStatus = DetectionStatus.UNKNOWN
+            riskLevel = RiskLevel.UNKNOWN
+            evidences.add(DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.debuggable, ro.secure",
                 "低版本 Android 无法读取预期的系统属性"
-            ));
+            ))
 
-            if (debuggable != null && debuggable.equals("1")) { // 读取到了 debuggable
-                detectionStatus = DetectionStatus.DETECTED;
-                riskLevel = RiskLevel.CRITICAL;
-                evidences.add(new DetectionEvidence(
+            if (debuggable != null && debuggable == "1") {  // 读取到了 debuggable
+                detectionStatus = DetectionStatus.DETECTED
+                riskLevel = RiskLevel.CRITICAL
+                evidences.add(DetectionEvidence(
                     "SYSTEM_PROPERTY",
                     "ro.debuggable",
                     "ro.debuggable == 1"
-                ));
+                ))
             }
-            else if (secure != null && secure.equals("0")) {    // 读取到了 secure
-                detectionStatus = DetectionStatus.DETECTED;
-                riskLevel = RiskLevel.CRITICAL;
-                evidences.add(new DetectionEvidence(
+            else if (secure != null && secure == "0") {     // 读取到了 secure
+                detectionStatus = DetectionStatus.DETECTED
+                riskLevel = RiskLevel.CRITICAL
+                evidences.add(DetectionEvidence(
                     "SYSTEM_PROPERTY",
                     "ro.secure",
                     "ro.secure == 0"
-                ));
+                ))
             }
         }
 
         // 最后再判断 ro.build.type == user 的问题
-        if (!Build.TYPE.equals("user")) {   // TYPE = getString("ro.build.type")
-            detectionStatus = DetectionStatus.DETECTED;
-            riskLevel = RiskLevel.CRITICAL;
-            evidences.add(new DetectionEvidence(
+        if (Build.TYPE != "user") {   // TYPE = getString("ro.build.type")
+            detectionStatus = DetectionStatus.DETECTED
+            riskLevel = RiskLevel.CRITICAL
+            evidences.add(DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.build.type",
                 "ro.build.type != user"
-            ));
+            ))
         }
 
-        return new DetectionResult(getId(), getCategory(), detectionStatus, riskLevel, evidences);
+        return DetectionResult(id, category, detectionStatus, riskLevel, evidences)
     }
 
     // 安卓13或者更高版本
-    private DetectionResult evaluateGreaterEqualTiramisu() {
-        DetectionStatus detectionStatus = DetectionStatus.NOT_DETECTED;
-        RiskLevel riskLevel = RiskLevel.NONE;
-        List<DetectionEvidence> evidences = new ArrayList<>();
+    private fun evaluateGreaterEqualTiramisu(): DetectionResult {
+        var detectionStatus: DetectionStatus = DetectionStatus.NOT_DETECTED
+        var riskLevel: RiskLevel = RiskLevel.NONE
+        val evidences: MutableList<DetectionEvidence> = ArrayList()
 
-        String debuggable = SystemPropertiesUtils.getprop("ro.debuggable");
-        String secure = SystemPropertiesUtils.getprop("ro.secure");
+        val debuggable: String? = SystemPropertiesUtils.getprop("ro.debuggable")
+        val secure: String? = SystemPropertiesUtils.getprop("ro.secure")
 
         // 按道理来说是读不到的
         if (debuggable != null || secure != null) { // 读到了反而有点奇怪
-            detectionStatus = DetectionStatus.UNKNOWN;
-            riskLevel = RiskLevel.UNKNOWN;
-            evidences.add(new DetectionEvidence(
+            detectionStatus = DetectionStatus.UNKNOWN
+            riskLevel = RiskLevel.UNKNOWN
+            evidences.add(DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.debuggable, ro.secure",
                 "高版本 Android 读取到了预期的系统属性"
-            ));
+            ))
 
-
-            if (debuggable != null && debuggable.equals("1")) {
-                detectionStatus = DetectionStatus.DETECTED;
-                riskLevel = RiskLevel.CRITICAL;
-                evidences.add(new DetectionEvidence(
+            if (debuggable != null && debuggable == "1") {
+                detectionStatus = DetectionStatus.DETECTED
+                riskLevel = RiskLevel.CRITICAL
+                evidences.add(DetectionEvidence(
                     "SYSTEM_PROPERTY",
                     "ro.debuggable",
                     "ro.debuggable == 1"
-                ));
+                ))
             }
 
-            if (secure != null && secure.equals("0")) {
-                detectionStatus = DetectionStatus.DETECTED;
-                riskLevel = RiskLevel.CRITICAL;
-                evidences.add(new DetectionEvidence(
+            if (secure != null && secure == "0") {
+                detectionStatus = DetectionStatus.DETECTED
+                riskLevel = RiskLevel.CRITICAL
+                evidences.add(DetectionEvidence(
                     "SYSTEM_PROPERTY",
                     "ro.secure",
                     "ro.secure == 0"
-                ));
+                ))
             }
         }
 
-        if (!Build.TYPE.equals("user")) {
-            detectionStatus = DetectionStatus.DETECTED;
-            riskLevel = RiskLevel.CRITICAL;
-            evidences.add(new DetectionEvidence(
+        if (Build.TYPE != "user") {
+            detectionStatus = DetectionStatus.DETECTED
+            riskLevel = RiskLevel.CRITICAL
+            evidences.add(DetectionEvidence(
                 "SYSTEM_PROPERTY",
                 "ro.build.type",
                 "ro.build.type != user"
-            ));
+            ))
         }
 
-        return new DetectionResult(getId(), getCategory(), detectionStatus, riskLevel, evidences);
+        return DetectionResult(id, category, detectionStatus, riskLevel, evidences)
+    }
+
+    companion object {
+        private const val TAG: String = "SystemPropertyDetector"
     }
 }
