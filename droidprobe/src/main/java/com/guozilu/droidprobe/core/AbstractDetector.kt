@@ -40,6 +40,6 @@ abstract class AbstractDetector protected constructor(
     }
 
     companion object {
-        private const val TAG: String = "AbstractDetector";
+        private const val TAG: String = "AbstractDetector"
     }
 }

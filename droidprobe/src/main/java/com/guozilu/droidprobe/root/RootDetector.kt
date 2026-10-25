@@ -28,12 +28,12 @@ class RootDetector : CompositeDetector("root",
 
         // 聚合 Root 结果
         results.forEach { result ->
-            Log.i(TAG, result.toString());
+            Log.i(TAG, result.toString())
         }
 
         // 先看看能不能正常运行，再考虑返回结果该怎么设计
         return DetectionResult("root_detector", DetectionCategory.ROOT, DetectionStatus.UNKNOWN,
-            RiskLevel.UNKNOWN, mutableListOf());
+            RiskLevel.UNKNOWN, mutableListOf())
     }
 
     companion object {

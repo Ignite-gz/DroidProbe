@@ -34,7 +34,7 @@ class SuDetector : AbstractRootBinaryDetector(
                     "SU_EXECUTED",
                     executeSuResult,
                     "执行 su -c id 后 $executeSuResult"
-                ));
+                ))
             }
         }
         return evidences
@@ -82,6 +82,6 @@ class SuDetector : AbstractRootBinaryDetector(
     }
 
     companion object {
-        private const val TAG: String = "SuDetector";
+        private const val TAG: String = "SuDetector"
     }
 }

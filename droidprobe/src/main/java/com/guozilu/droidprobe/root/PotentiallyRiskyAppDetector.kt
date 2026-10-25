@@ -1,4 +1,4 @@
-package com.guozilu.droidprobe.root;
+package com.guozilu.droidprobe.root
 
 import android.content.Context
 import android.content.pm.PackageManager

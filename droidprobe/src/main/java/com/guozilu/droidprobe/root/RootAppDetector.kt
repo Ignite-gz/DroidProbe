@@ -52,7 +52,7 @@ class RootAppDetector : AbstractDetector(
     }
 
     companion object {
-        private const val TAG: String = "RootAppDetector";
+        private const val TAG: String = "RootAppDetector"
 
         private val ROOT_APP_PACKAGES: Array<String> = arrayOf(
             // Magisk

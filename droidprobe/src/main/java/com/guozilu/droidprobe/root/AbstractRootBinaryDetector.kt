@@ -50,7 +50,7 @@ abstract class AbstractRootBinaryDetector(
         }
 
         // 进行其他补充的检测
-        evidences.addAll(detectOthers());
+        evidences.addAll(detectOthers())
 
         if (evidences.isEmpty()) {
             return DetectionResult(
