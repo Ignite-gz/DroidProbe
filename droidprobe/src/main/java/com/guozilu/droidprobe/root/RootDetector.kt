@@ -37,6 +37,6 @@ class RootDetector : CompositeDetector("root",
     }
 
     companion object {
-        private val TAG: String = "RootDetector"
+        private const val TAG: String = "RootDetector"
     }
 }

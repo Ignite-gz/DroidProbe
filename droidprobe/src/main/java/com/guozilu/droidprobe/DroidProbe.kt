@@ -1,24 +1,20 @@
-package com.guozilu.droidprobe;
+package com.guozilu.droidprobe
 
-import android.content.Context;
+import android.content.Context
+import com.guozilu.droidprobe.core.DetectionResult
+import com.guozilu.droidprobe.core.EnvironmentReport
+import com.guozilu.droidprobe.root.RootDetector
 
-import com.guozilu.droidprobe.core.DetectionResult;
-import com.guozilu.droidprobe.core.EnvironmentReport;
-import com.guozilu.droidprobe.root.RootDetector;
-
-import java.util.ArrayList;
-import java.util.List;
-
-public class DroidProbe {
-    public EnvironmentReport scan(Context context) {
-        Context applicationContext = context.getApplicationContext();
-        List<DetectionResult> results = new ArrayList<>();
+class DroidProbe {
+    fun scan(context: Context): EnvironmentReport {
+        val applicationContext: Context = context.applicationContext
+        val results: MutableList<DetectionResult> = ArrayList()
 
         // 后面在这里调用各种 Detector
-        results.add(new RootDetector().detect(applicationContext));
-        // results.add(new DeviceDetector().detect(applicationContext));
-        // results.add(new RuntimeDetector().detect(applicationContext));
+        results.add(RootDetector().detect(applicationContext))
+        // results.add(DeviceDetector().detect(applicationContext))
+        // results.add(RuntimeDetector().detect(applicationContext))
 
-        return new EnvironmentReport(System.currentTimeMillis(), results);
+        return EnvironmentReport(System.currentTimeMillis(), results)
     }
 }

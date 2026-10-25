@@ -7,17 +7,9 @@ import android.util.Log
  * 一个抽象类，实现了 Detector 接口，继承该类时，应该实现 doDetect 方法以进行检测功能
  */
 abstract class AbstractDetector protected constructor(
-    private val id: String,
-    private val category: DetectionCategory
+    val id: String,
+    val category: DetectionCategory
 ) : Detector {
-    override fun getId(): String {
-        return id
-    }
-
-    override fun getCategory(): DetectionCategory {
-        return category
-    }
-
     override fun detect(context: Context?): DetectionResult {
         return try {
             doDetect(context)
@@ -39,7 +31,7 @@ abstract class AbstractDetector protected constructor(
      * @param throwable 发生的异常
      * @return 发生异常时应该得到的 DetectionResult 检测结果
      */
-    private fun createErrorResult(throwable: Throwable?): DetectionResult {
+    private fun createErrorResult(throwable: Throwable): DetectionResult {
         Log.e(TAG, "A throwable was caught in AbstractDetector.detect()", throwable)
         return DetectionResult(
             getId(), getCategory(), DetectionStatus.ERROR,
@@ -48,6 +40,6 @@ abstract class AbstractDetector protected constructor(
     }
 
     companion object {
-        private val TAG: String = "AbstractDetector";
+        private const val TAG: String = "AbstractDetector";
     }
 }
