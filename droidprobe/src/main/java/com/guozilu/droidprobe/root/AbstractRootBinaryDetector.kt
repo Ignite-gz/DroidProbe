@@ -97,9 +97,9 @@ abstract class AbstractRootBinaryDetector(
         val file: File = File(path)
         if (file.exists()) {
             evidences.add(DetectionEvidence(
-                file.getName().uppercase() + "_PATH",
+                file.name.uppercase() + "_PATH",
                 path,
-                "发现 " + file.getName() + " 文件"
+                "发现 " + file.name + " 文件"
             ))
 
             evidences.addAll(detectBinaryExecutionEvidences(file))
@@ -173,7 +173,7 @@ abstract class AbstractRootBinaryDetector(
                 return paths
             }
 
-            for (systemPath: String in systemPaths.split(":")) {
+            systemPaths.split(":").forEach { systemPath: String ->
                 var systemPathTemp = systemPath
                 if (!systemPathTemp.endsWith("/")) {
                     systemPathTemp += "/"
